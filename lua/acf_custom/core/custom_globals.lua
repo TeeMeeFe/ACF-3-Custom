@@ -1,4 +1,4 @@
---local ACF = ACF
+ACF = ACF
 
 do -- Globals
     ACF.SpeedOfSound = 343 -- In Meters Per Second

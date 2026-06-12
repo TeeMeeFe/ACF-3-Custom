@@ -1,6 +1,6 @@
 local ACF = ACF
 
-if SERVER then return end
+if SERVER then return end -- Silence wench
 
 function CreateMenu(Menu)
 
