@@ -1,3 +1,9 @@
 local ACF = ACF
 
-ACF.AddMenuItem(209, "#acf.menu.entities", "Custom Engines", "car", function() end)
+if SERVER then return end
+
+function CreateMenu(Menu)
+
+end
+
+ACF.AddMenuItem(299, "#acf.menu.entities", "Custom Engines", "car", CreateMenu)
