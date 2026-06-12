@@ -7,5 +7,3 @@ do -- Update checker
         hook.Remove("ACF_OnLoadAddon", "ACF Custom Update Checker")
     end)
 end
-
-print("ACF Custom loaded successfully!")
