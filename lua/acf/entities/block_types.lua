@@ -149,7 +149,7 @@ ACF.Classes.DefineClass("ACF.Engines.BlockType", function()
         clearance_cm = math.Clamp(clearance_cm, 0.05, stroke_cm - 0.01)
 
         -- ── Layout factors ────────────────────────────────────
-        local f = self:GetLayoutFactors(params)
+        local f = CLASS:GetLayoutFactors(params)
 
         -- ── 1. Compression ratio (dimensionless — cm cancel) ──
         local CR = 1 + stroke_cm / clearance_cm

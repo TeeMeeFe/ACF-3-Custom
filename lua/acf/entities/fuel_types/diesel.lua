@@ -1,10 +1,9 @@
-local FuelTypes = ACF.Classes.FuelTypes
-
-FuelTypes.Register("Diesel", {
-    Name         = "Diesel",
-    IgnitionType = "glow", -- compression ignition; glow plugs for cold start
-    Efficiency   = 0.243,  -- kg/kWh (up to 0.274 at best efficiency)
-    Stoich_AFR   = 14.5,   -- Stoichiometric Air Fuel Ratio
-    --RequiresGlowPlugs = true,
-    -- PistonSpeed  = 13,     -- m/s (diesel long-stroke limit)
-})
+ACF.Classes.DefineClass("ACF.FuelTypes.CustomDiesel", "ACF.FuelTypes.BaseFuelType", function()
+    CLASS.Name         = "Diesel Fuel"
+    CLASS.ShortName    = "Diesel"
+    CLASS.Density      = 0.745  -- kg/L
+    CLASS.IgnitionType = "glow" -- Ignition through compression; glow plugs required for cold start
+    CLASS.Efficiency   = 0.243  -- kg/kWh (up to 0.274 at best efficiency)
+    CLASS.Stoich_AFR   = 14.5   -- Stoichiometric Air Fuel Ratio
+    CLASS.IsExplosive  = false  -- Ignition is done by compression instead 
+end)

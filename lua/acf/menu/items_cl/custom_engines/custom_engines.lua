@@ -1,7 +1,10 @@
 local function CreateMenu(Menu)
-    ACF.SetToolMode("acf_menu", "Spawner", "custom_engines")
+    ACF.SetToolMode("acf_menu", "Spawner", "engine")
     ACF.SetClientData("PrimaryClass", "acf_engine_custom")
-    ACF.SetClientData("SecondaryClass", "N/A")
+    ACF.SetClientData("SecondaryClass", "acf_fueltank")
+    ACF.SetClientData("FuelTank", "ACF.FuelTanks.ScalableFuelTank") -- Set default fuel tank to scalable
+
+    ACF.SetToolMode("acf_menu", "Spawner", "Engine")
 
     Menu:AddTitle("Custom Engine Settings")
     Menu:AddHelp("Create a custom engine from scratch.")

@@ -1,16 +1,11 @@
-AddCSLuaFile("cl_init.lua")
 AddCSLuaFile("shared.lua")
+AddCSLuaFile("cl_init.lua")
 
 include("shared.lua")
 
-local ACF = ACF
-local Mobility = ACF.Mobility
-local MobilityObj = Mobility.Objects
-local MaxDistance = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
+-- Shamefully stolen from acf_baseplate
+ENT.ACF_UserWeighable             = false
+--ENT.ACF_KillableButIndestructible = false
+ENT.ACF_HealthUpdatesWireOverlay  = true
 
-local ENTITY  = FindMetaTable("Entity")
-local PHYSOBJ = FindMetaTable("PhysObj")
-
-local IsEntityValid	 = ACF.Optimizations.IsEntityValid
-local IsPhysObjValid = ACF.Optimizations.IsPhysObjValid
-
+include("modules/spawning.lua")

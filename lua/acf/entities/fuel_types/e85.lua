@@ -1,10 +1,8 @@
-local FuelTypes = ACF.Classes.FuelTypes
-
-FuelTypes.Register("E85", {
-    Name          = "Ethanol 85",
-    IgnitionType  = "spark", -- ignition through sparkplugs
-    Efficiency    = 0.7,     -- kg/kWh BSFC, much lower density than petrol, so roughly 30% more fuel by mass is needed
-    Stoich_AFR    = 9.7,     -- Stoichiometric Air Fuel Ratio
-    -- PlugHeatRange = 8,       -- stock NGK heat range
-    -- PistonSpeed   = 20,      -- m/s mean piston speed limit
-})
+ACF.Classes.DefineClass("ACF.FuelTypes.E85", "ACF.FuelTypes.BaseFuelType", function()
+    CLASS.Name         = "Ethanol 85 Fuel"
+    CLASS.ShortName    = "E85"
+    CLASS.Density      = 0.785   -- kg/L
+    CLASS.IgnitionType = "spark" -- ignition through sparkplugs
+    CLASS.Efficiency   = 0.7     -- kg/kWh BSFC, lower energy density than petrol so roughly 30% more fuel by mass is needed
+    CLASS.Stoich_AFR   = 9.8     -- Stoichiometric Air Fuel Ratio
+end)
