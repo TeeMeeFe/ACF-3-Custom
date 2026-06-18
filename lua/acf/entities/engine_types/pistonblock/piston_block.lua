@@ -14,8 +14,6 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
     })
 
     function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-        local TypeSelector = ACF.Classes.CreateTypeSelector(SubMenu, CLASS, "EngineTypes")
-        local ClassList    = TypeSelector.ComboBox
-        PrintTable({ClassList})
+        ACF.Classes.CreateTypeSelector(SubMenu, CLASS, "EngineTypes")
     end
 end)    

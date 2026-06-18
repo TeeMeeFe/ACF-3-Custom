@@ -7,8 +7,7 @@ local function CreateMenu(Menu)
     Menu:AddHelp("Create a custom engine from scratch.")
 
     local EntityClassDef = ACF.Classes.GetTypeByName("acf_engine_custom")
-    local TypeSelector = ACF.Classes.CreateTypeSelector(Menu, EntityClassDef, "BlockType")
-    local ClassList    = TypeSelector.ComboBox
+    ACF.Classes.CreateTypeSelector(Menu, EntityClassDef, "BlockType")
 end
 
 ACF.AddMenuItem(299, "#acf.menu.entities", "Custom Engines", "car", CreateMenu)

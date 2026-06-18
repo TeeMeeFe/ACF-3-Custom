@@ -93,7 +93,6 @@ ACF.Classes.DefineClass("ACF.Engines.BlockType", function()
     -- Wankel: power strokes per rotor per shaft revolution
     CLASS.WANKEL_POWER_STROKES = 3  -- TODO: This shouldn't be here IMHO
 
-    FIELD("ACF.Engines.BlockType", "BlockType", {"PistonBlock", "TurbineBlock", "ElectricBlock"})
     -- ──────────────────────────────────────────────────────────
     --  Torque curve builder (shared by all layouts)
     -- ──────────────────────────────────────────────────────────
@@ -135,11 +134,6 @@ ACF.Classes.DefineClass("ACF.Engines.BlockType", function()
     --- Returns a flat table of multipliers — see header for field list.
     function CLASS:GetLayoutFactors(params)
         error("EngineBlock:GetLayoutFactors() must be overridden by layout subclass")
-    end
-
-    --- Must be overridden. Returns the complete geo table.
-    function CLASS:Compute(typeDef, params)
-        error("EngineBlock:Compute() must be overridden by layout subclass")
     end
 
     --- Shared piston geometry computation.
