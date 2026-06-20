@@ -16,12 +16,15 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
     })
 
     function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-        ACF.Classes.CreateTypeSelector(SubMenu, CLASS, "EngineTypes")
+        local TypeSelector = ACF.Classes.CreateTypeSelector(SubMenu, CLASS, "EngineTypes")
+        local ClassList    = TypeSelector.ComboBox
+
+        if ClassList and ClassList.Selected then
+            ACF.SetClientData("EngineBlockModel", ClassList.Selected.Model)
+        end
 
         ACF.SetClientData("PrimaryClass", "acf_engine_custom")
         ACF.SetClientData("SecondaryClass", "acf_fueltank")
         ACF.SetClientData("FuelTank", "ACF.FuelTanks.ScalableFuelTank") -- Set default fuel tank to scalable
-
-        ACF.SetToolMode("acf_menu", "Spawner", "engine_custom")
     end
 end)    

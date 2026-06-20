@@ -2,25 +2,37 @@ local ACF      		= ACF
 local Notify        = ACF.Utilities.Notify
 local Contraption   = ACF.Contraption
 
-function ENT.ACF_OnVerifyClientData(ClientData)
-    --ClientData.EnginePistons = Number(ClientData.EnginePistons)
+local DefaultModel = "models/holograms/cube.mdl"
+
+local function ResolveType(Value, Default)
+	local Name = istable(Value) and Value.Type or Value
+	return Classes.GetTypeByName(Name) or Classes.GetTypeByName(Default)
 end
 
-function ENT:ACF_OnSpawn(Player, Pos, Angle, Data)
-    local BaseClass = ACF.Classes.GetBaseClass(ENT)
+function ENT.ACF_OnVerifyClientData(ClientData) end
+function ENT:ACF_PreSpawn(Player, _, _, ClientData)
+	local Model = ClientData.EngineBlockModel
 
-    PrintTable({BaseClass})
+	if not Model then
+		Model = DefaultModel
+		Notify.WarningToPlayer(Player, "Failed to fetch class model!", "Fallback to default cube model.")
+	end
+	self:SetScaledModel(Model)
+end
 
-    local Entity = ents.Create("acf_engine_custom")
+local function UpdateEngine(Entity, Data, Class, Engine, Type)
 
-    if not IsValid(Entity) then return false end
+end
 
-    --Entity:SetAngles(Angle)
-    --Entity:SetPos(Pos)
-    Entity:Spawn()
+function ENT:ACF_OnSpawn(Player, _, _, ClientData)
+	local Entity = ents.Create("acf_engine_custom")
+	if not IsValid(Entity) then return false end
 
-    --Player:AddCleanup("acf_engine", Entity)
-    --Player:AddCount(Limit, Entity)
+
+	Entity:Spawn()
+
+	Notify.NoticeToPlayer(Player, "Attempt to create entity was successful!")
+	duplicator.ClearEntityModifier(self, "mass")
 end
 
 --[[ ACF Legality Check

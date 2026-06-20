@@ -1,7 +1,7 @@
 ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", function()
     CLASS.Name         = "Inline Engine"
     CLASS.Description  = "A piston engine in a inlined configuration"
-    CLASS.Model        = ""
+    CLASS.Model        = "models/engines/inline4s.mdl"
     -- These attributes would be private if we had actual scaffolding for that
     local __INLINE_BAL = { [2] = 0.72, [3] = 0.78, [4] = 0.84, [5] = 0.88, [6] = 0.96, [7] = 0.98, [8] = 1.00 }
     local __INLINE_IDL = { [2] = 1.08, [3] = 1.05, [4] = 1.00, [5] = 0.97, [6] = 0.92, [7] = 0.90, [8] = 0.88 }
