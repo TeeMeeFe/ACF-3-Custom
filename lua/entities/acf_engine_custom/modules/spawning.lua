@@ -1,40 +1,53 @@
 local ACF      		= ACF
-local Notify        = ACF.Utilities.Notify
+local Classes       = ACF.Classes
 local Contraption   = ACF.Contraption
+local Notify        = ACF.Utilities.Notify
 
-local DefaultModel = "models/holograms/cube.mdl"
+local DefaultModel = "ACF.Engines.PistonBlock.DefaultModel"
 
+-- ClientData values may be an FQN string (menu) or a serialized {Type=...} table (dupe).
 local function ResolveType(Value, Default)
 	local Name = istable(Value) and Value.Type or Value
 	return Classes.GetTypeByName(Name) or Classes.GetTypeByName(Default)
 end
 
-function ENT.ACF_OnVerifyClientData(ClientData) end
-function ENT:ACF_PreSpawn(Player, _, _, ClientData)
-	local Model = ClientData.EngineBlockModel
+function ENT:ACF_OnVerifyClientData(ClientData) end
+function ENT:ACF_PreSpawn(_, _, _, ClientData)
+	local EngineClass = ResolveType(ClientData.EngineBlockModel, DefaultModel)
 
-	if not Model then
-		Model = DefaultModel
-		Notify.WarningToPlayer(Player, "Failed to fetch class model!", "Fallback to default cube model.")
-	end
-	self:SetScaledModel(Model)
+	PrintTable({Classes.GetTypeByName(ClientData.EngineBlockModel)})
+	PrintTable({Classes.GetTypeByName(ClientData.OnInit)})
+	self:SetScaledModel(EngineClass.Model or EngineClass.DefaultModel)
 end
 
-local function UpdateEngine(Entity, Data, Class, Engine, Type)
-
-end
-
-function ENT:ACF_OnSpawn(Player, _, _, ClientData)
+function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 	local Entity = ents.Create("acf_engine_custom")
 	if not IsValid(Entity) then return false end
 
-
 	Entity:Spawn()
 
-	Notify.NoticeToPlayer(Player, "Attempt to create entity was successful!")
+	Entity.Active        = false
+	Entity.Gearboxes     = {}
+	Entity.FuelTanks     = {}
+	Entity.LastThink     = 0
+
 	duplicator.ClearEntityModifier(self, "mass")
 end
 
+function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
+	--Contraption.SetModel(self, Model)
+	Contraption.SetMass(self, 100) -- We later get the mass of the contraption
+
+	duplicator.StoreEntityModifier(self, "mass", { Mass = 100 })
+	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
+
+	--PrintTable(ACF.GetAllClientData(Owner))
+	PrintTable(self.ACF_LiveData)
+end
+
+function ENT:ACF_OnUpdateEntityData()
+	--PrintTable(self.ACF_LiveData)
+end
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:
 	ENT.ACF.PhysObj defined when spawned
