@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.FuelTypes.CustomPetrol", "ACF.FuelTypes.BaseFuelType", function()
+ACF.Classes.DefineClass("ACF.FuelTypes.CustomPetrol", "ACF.FuelTypes.FuelType", function()
     CLASS.Name         = "Petrol Fuel"
     CLASS.ShortName    = "Petrol"
     CLASS.Density      = 0.755   -- kg/L

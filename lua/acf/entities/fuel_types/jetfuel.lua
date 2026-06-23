@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.FuelTypes.JetFuel", "ACF.FuelTypes.BaseFuelType", function()
+ACF.Classes.DefineClass("ACF.FuelTypes.JetFuel", "ACF.FuelTypes.FuelType", function()
     CLASS.Name         = "Jet Fuel"
     CLASS.ShortName    = "JetFuel"
     CLASS.Density      = 0.832  -- kg/L

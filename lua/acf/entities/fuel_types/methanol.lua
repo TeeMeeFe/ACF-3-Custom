@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.FuelTypes.Methanol", "ACF.FuelTypes.BaseFuelType", function()
+ACF.Classes.DefineClass("ACF.FuelTypes.Methanol", "ACF.FuelTypes.FuelType", function()
     CLASS.Name         = "Methanol Fuel"
     CLASS.ShortName    = "Methanol"
     CLASS.Density      = 0.792    -- kg/L, slightly denser than e85 and petrol

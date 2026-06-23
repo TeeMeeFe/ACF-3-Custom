@@ -3,6 +3,10 @@ local Classes       = ACF.Classes
 local Contraption   = ACF.Contraption
 local Notify        = ACF.Utilities.Notify
 
+local ENTITY        = FindMetaTable("Entity")
+local PHYSOBJ       = FindMetaTable("PhysObj")
+local VECTOR        = FindMetaTable("Vector")
+
 local DefaultModel = "ACF.Engines.PistonBlock.DefaultModel"
 
 -- ClientData values may be an FQN string (menu) or a serialized {Type=...} table (dupe).
@@ -12,41 +16,60 @@ local function ResolveType(Value, Default)
 end
 
 function ENT:ACF_OnVerifyClientData(ClientData) end
+function ENT:ACF_PostUpdateEntityData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
-	local EngineClass = ResolveType(ClientData.EngineBlockModel, DefaultModel)
+	local EngineClass = ResolveType(ClientData.CustomEngineClass, DefaultModel)
 
-	PrintTable({Classes.GetTypeByName(ClientData.EngineBlockModel)})
-	PrintTable({Classes.GetTypeByName(ClientData.OnInit)})
-	self:SetScaledModel(EngineClass.Model or EngineClass.DefaultModel)
+	self:SetScaledModel(EngineClass.Model or DefaultModel)
 end
 
 function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
-	local Entity = ents.Create("acf_engine_custom")
-	if not IsValid(Entity) then return false end
+	-- I dunno if its even correct to do this at this stage...
+	local Pistons 	= ClientData.CustomEnginePistons or 0
+	local Bore 		= ClientData.CustomEngineBore or 0
+	local Stroke 	= ClientData.CustomEngineStroke or 0
+	local Clearance = ClientData.CustomEngineClearance or 0
 
-	Entity:Spawn()
-
-	Entity.Active        = false
-	Entity.Gearboxes     = {}
-	Entity.FuelTanks     = {}
-	Entity.LastThink     = 0
+	self.Active        = false
+	self.Gearboxes     = {}
+	self.FuelTanks     = {}
+	self.LastThink     = 0
+	self.Pistons 	   = Pistons
+	self.Bore          = Bore
+	self.Stroke        = Stroke
+	self.Clearance     = Clearance
 
 	duplicator.ClearEntityModifier(self, "mass")
 end
 
 function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
-	--Contraption.SetModel(self, Model)
 	Contraption.SetMass(self, 100) -- We later get the mass of the contraption
-
 	duplicator.StoreEntityModifier(self, "mass", { Mass = 100 })
-	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
 
-	--PrintTable(ACF.GetAllClientData(Owner))
-	PrintTable(self.ACF_LiveData)
+	local Params = {
+		Pistons   = self.Pistons,
+		Bore	  = self.Bore,
+		Stroke 	  = self.Stroke,
+		Clearance = self.Clearance
+	}
+
+	local Sel = ClientData.CustomEngineClass
+	local Class = Classes.GetTypeByName(Sel)
+
+	local LayoutFactors = Class.GetLayoutFactors(self.Pistons)
+	local Compute = Class.Compute(Sel, LayoutFactors, Params)
+
+	PrintTable(Compute)
+	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
+end
+
+function ENT:PostEntityPaste(_, _, CreatedEntities)
+	print("Ran ENT:PostEntityPaste()")
 end
 
 function ENT:ACF_OnUpdateEntityData()
-	--PrintTable(self.ACF_LiveData)
+	PrintTable(self.ACF_LiveData)
+	print("Ran ENT:ACF_OnUpdateEntityData()")
 end
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:
