@@ -95,7 +95,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
     -- ──────────────────────────────────────────────────────────
     --- Expand a normalised TorqueCurve array into a Nm lookup table.
     --- typeCurve: flat array {mult0, mult1, ...} 0-1, evenly spaced over RPM.
-    --- @return table  {curve, steps, maxTorque, maxRPM, Sample}
+    --- @return table  {Curve:table, Steps:number, Sample:function, PeakPower:table, PeakTorque:table, PowerBand:table}
     local function BuildCurve(typeCurve, peakTorque, maxRPM, steps)
         local POWER_BAND_THRESHOLD = 0.80   -- fraction of peak power that defines the band edges
         local TWO_PI_OVER_60       = 2 * PI / 60
@@ -111,6 +111,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local peakTorqueAtRPM = 0
 
         local rpmStep = maxRPM / steps
+
+        -- Compute the curve and define peaks 
         for i = 0, steps do
             local pos   = (i / steps) * (n - 1)
             local idx0  = floor(pos)

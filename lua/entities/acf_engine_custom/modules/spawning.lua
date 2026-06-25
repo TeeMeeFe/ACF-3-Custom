@@ -1,4 +1,8 @@
 local ACF      		= ACF
+local Mobility      = ACF.Mobility
+local MobilityObj   = Mobility.Objects
+local MaxDistance   = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
+
 local Classes       = ACF.Classes
 local Contraption   = ACF.Contraption
 local Notify        = ACF.Utilities.Notify
@@ -24,13 +28,15 @@ local function ResolveType(Value, Default)
 end
 
 function ENT:ACF_OnVerifyClientData(ClientData) end
-function ENT:ACF_PostUpdateEntityData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
-	local EngineClass = ResolveType(ClientData.CustomEngineClass, DefaultModel)
-
 	self.ACF = {}
-	self.Class = EngineClass
-	self:SetScaledModel(EngineClass.Model or DefaultModel)
+
+	local EngineClass = ResolveType(ClientData.CustomEngineClass, DefaultModel)
+	local Model = EngineClass.Model
+
+	self.ACF.Class = EngineClass
+	self.ACF.Model = Model
+	self:SetScaledModel(Model or DefaultModel)
 end
 
 function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
@@ -46,7 +52,7 @@ function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 	self.LastThink     = 0
 	self.Layout 	   = ""
 	self.Throttle 	   = 0
-	self.State         = "idle"
+	self.State         = "Idle"
 	self.SoundBanks    = {}
 	self.Temperature   = {Water = ACF.AmbientTemperature, Oil = ACF.AmbientTemperature}
 	self.Pistons 	   = Pistons
@@ -95,8 +101,7 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.IdleRPM			= Compute.IdleRPM
 	self.Layout				= Compute.Layout
 	self.RedlineRPM   		= Compute.RedlineRPM
-	self.OilSumpTiltStarve  = Compute.OilSumpTiltStarve
-	self.OilSumpTiltWarn    = Compute.OilSumpTiltWarn
+	self.OilSumpTilt  		= {Starve = Compute.OilSumpTiltStarve, Warn = Compute.OilSumpTiltWarn}
 	self.PeakTorque			= Compute.PeakTorque
 	self.PeakPower			= Compute.PeakPower
 	self.PowerBand			= Compute.PowerBand
@@ -109,14 +114,13 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.Stroke				= Compute.StrokeCm
 	self.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	self.TorqueSmoothness	= Compute.TorqueSmoothness
-	self.TorqueCurve		= Compute.Curve
-	self.TorqueCurve.Steps  = Compute.Steps
+	self.TorqueCurve		= {Values = Compute.Curve, Steps = Compute.Steps}
 	self.HitBoxes         	= ACF.GetHitboxes(self:GetModel())
-	self.Out              	= ACF.LocalPlane(self:WorldToLocal(self:GetAttachment(self:LookupAttachment("driveshaft")).Pos))
+	self.Out              	= ACF.LocalPlane(self:WorldToLocal(self:GetAttachment(self:LookupAttachment("driveshaft")).Pos), Vector(1, 0, 0))
 
 	WireLib.TriggerOutput(self, "State", "idle")
 
-	PrintTable(Compute)
+	--PrintTable(Compute)
 	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
 end
 
@@ -128,6 +132,17 @@ function ENT:ACF_OnUpdateEntityData()
 	PrintTable(self.ACF_LiveData)
 	print("Ran ENT:ACF_OnUpdateEntityData()")
 end
+
+function ENT:ACF_PostUpdateEntityData()
+	print(self.ACF_GetUserVar("BlockType"))
+	print(self.ACF_GetUserVar("FuelType"))
+	PrintTable(self.ACF_LiveData)
+	print("Ran ENT:ACF_PostUpdateEntityData()")
+end
+
+ACF.RegisterLinkSource("acf_engine_custom", "Gearboxes")
+ACF.RegisterLinkSource("acf_engine_custom", "FuelTanks")
+
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:
 	ENT.ACF.PhysObj defined when spawned
