@@ -7,7 +7,15 @@ local ENTITY        = FindMetaTable("Entity")
 local PHYSOBJ       = FindMetaTable("PhysObj")
 local VECTOR        = FindMetaTable("Vector")
 
+-- Math Constants
+local Round = math.Round
+local Floor = math.floor
+local Abs   = math.abs
+
 local DefaultModel = "ACF.Engines.PistonBlock.DefaultModel"
+
+-- Engines should have these states: IDLE, STARTING, ACTIVE, STALLING
+-- Old engines had ACTIVE, IDLE. 
 
 -- ClientData values may be an FQN string (menu) or a serialized {Type=...} table (dupe).
 local function ResolveType(Value, Default)
@@ -20,6 +28,7 @@ function ENT:ACF_PostUpdateEntityData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	local EngineClass = ResolveType(ClientData.CustomEngineClass, DefaultModel)
 
+	self.ACF = {}
 	self:SetScaledModel(EngineClass.Model or DefaultModel)
 end
 
@@ -34,6 +43,11 @@ function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 	self.Gearboxes     = {}
 	self.FuelTanks     = {}
 	self.LastThink     = 0
+	self.Layout 	   = ""
+	self.Throttle 	   = 0
+	self.State         = "idle"
+	self.SoundBanks    = {}
+	self.Temperature   = {Water = ACF.AmbientTemperature, Oil = ACF.AmbientTemperature}
 	self.Pistons 	   = Pistons
 	self.Bore          = Bore
 	self.Stroke        = Stroke
@@ -59,7 +73,50 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	local LayoutFactors = Class.GetLayoutFactors(self.Pistons)
 	local Compute = Class.Compute(Sel, LayoutFactors, Params)
 
-	PrintTable(Compute)
+	local Displacement = Compute.Displacement
+	local Sign    = Compute.Sign
+	local Name 	  = ("%sL %s - %scc"):format(Round(Displacement.InLiters, 1), Sign, Round(Displacement.InCubicCentimeters))
+
+	-- Class compute table assignments
+	self.Name      			= Name
+	self.ShortName 			= Name
+	self.BalanceFactor  	= Compute.BalanceFactor
+	self.BigEndDiam     	= Compute.BigEndDiam_cm
+	self.BlockType	 		= Compute.IsPiston and "Piston" or Compute.IsTurbine and "Turbine" or Compute.IsElectric and "Electrical"
+	self.Bore	        	= Compute.BoreCm
+	self.BSFC 				= Compute.BSFC
+	self.CompressionRatio 	= Compute.CompressionRatio
+	self.Clearance      	= Compute.ClearanceCm
+	self.Displacement 		= Displacement
+	self.FiringIrregularity = Compute.FiringIrregularity
+	self.FlywheelInertia 	= Compute.FlywheelInertia
+	self.HeatCoefficient	= Compute.HeatCoeff
+	self.IdleRPM			= Compute.IdleRPM
+	self.Layout				= Compute.Layout
+	self.MaxRPM 	 		= Compute.maxRPM
+	self.MaxTorque			= Compute.maxTorque
+	self.OilSumpTiltStarve  = Compute.OilSumpTiltStarve
+	self.OilSumpTiltWarn    = Compute.OilSumpTiltWarn
+	self.PeakTorque			= Compute.PeakTorque
+	self.PeakPower			= self.PeakTorque * self.MaxRPM  / 9548.8
+	self.Pistons 			= Compute.Pistons
+	self.RedlineRPM   		= Compute.RedlineRPM
+	self.RodRatio			= Compute.RodRatio
+	self.State              = self.State
+	self.Sign 				= Sign
+	self.Sample				= Compute.Sample
+	self.SparksPerRev		= Compute.SparksPerRev
+	self.Stroke				= Compute.StrokeCm
+	self.SweptVolPerCyl		= Compute.SweptVolPerCyl
+	self.TorqueSmoothness	= Compute.TorqueSmoothness
+	self.TorqueCurve		= Compute.curve
+	self.TorqueCurve.Steps  = Compute.steps
+	self.HitBoxes         	= ACF.GetHitboxes(self:GetModel())
+	self.Out              	= ACF.LocalPlane(self:WorldToLocal(self:GetAttachment(self:LookupAttachment("driveshaft")).Pos))
+
+	WireLib.TriggerOutput(self, "State", "idle")
+
+	--PrintTable(Compute)
 	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
 end
 

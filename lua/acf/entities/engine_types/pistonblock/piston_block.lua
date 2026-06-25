@@ -5,7 +5,57 @@ local min = math.min
 local max = math.max
 local sqrt = math.sqrt
 
--- Base piston block class definition
+-- ===========================================================================
+--  Base piston block class definition 
+--
+--  ── Virtual method: GetLayoutFactors(params) ─────────────────
+--
+--  Each layout overrides this to return a flat table of multipliers
+--  applied on top of the shared piston geometry math:
+--
+--    InertiaFactor     – multiplier on flywheel inertia
+--    BalanceFactor     – crankshaft balance quality [0-1]; lower means
+--                        minimum stable idle RPM is higher
+--    TorqueSmoothness  – torque delivery evenness [0-1]; affects misfire
+--                        sensitivity and idle roughness
+--    BSFCMult          – correction on top of Otto-cycle BSFC
+--    IdleRPMMult       – scales the bore/stroke-derived idle RPM
+--    VEBonus           – volumetric efficiency offset [-0.1 .. +0.1]
+--    FiringIrregularity– fractional deviation from even firing [0-1]
+--
+--  ── Entity parameters (set in entity's instance module: spawning.lua) ─────
+--
+--  Piston engines:
+--    Layout      string  "inline"|"boxer"|"v"|"wr"|"wankel"|...etc 
+--    Bore        number  cylinder bore radius (cm)
+--    Stroke      number  piston stroke (cm)
+--    Clearance   number  TDC dead space (cm)
+--    Pistons     number  cylinder count (rotors for Wankel)
+--    BankAngle   number  degrees between banks (V, WR)
+--    BankCount   number  number of banks (WR only; V is always 2)
+--
+--  ── Geo table shape (identical for all engine types) ──────────────────────
+--
+--  All Compute() methods must return a geo table with these keys so that
+--  Combustion.lua and all downstream modules are layout-agnostic:
+--
+--    -- Geometry identity
+--    Layout, BankAngle, BankCount, IsPiston, IsWankel, IsTurbine, IsElectric
+--    -- Input parameters (stored for HUD / GetStatus)
+--    BoreCm, StrokeCm, ClearanceCm, Pistons
+--    -- Derived geometry (piston only; nil for non-piston)
+--    CompressionRatio, SweptVolPerCyl, Displacement
+--    -- Performance (all types)
+--    PeakTorque, RedlineRPM, IdleRPM
+--    BSFC, HeatCoeff, FlywheelInertia
+--    TorqueSmoothness, BalanceFactor, FiringIrregularity
+--    -- Torque curve (all types)
+--    maxTorque, maxRPM, steps, curve
+--    -- Sample method (closure over curve)
+--    Sample(rpm) → Nm
+--
+-- ===========================================================================
+
 ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", function()
     CLASS.Name          = "Piston Block Class"
     CLASS.Description   = "The base class for any and all piston engines."
@@ -27,7 +77,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
     -- Wankel: power strokes per rotor per shaft revolution
     --CLASS.WANKEL_POWER_STROKES = 3  -- TODO: This shouldn't be here IMHO
 
-    FIELD("ACF.Engines.PistonBlock", "EngineTypes", {
+    MENU_FIELD("ACF.Engines.PistonBlock", "EngineTypes", {
         "InlineEngine",
         "BoxerEngine",
         "VTypeEngine",
@@ -46,7 +96,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
     --- typeCurve: flat array {mult0, mult1, ...} 0-1, evenly spaced over RPM.
     --- @return table  {curve, steps, maxTorque, maxRPM, Sample}
     local function BuildCurve(typeCurve, peakTorque, maxRPM, steps)
-        steps = steps or 20
+        steps = steps or 200
         local n      = #typeCurve
         local curve  = {}
         for i = 0, steps do
@@ -92,8 +142,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- TypeDef would be the fuel type being used, taken from old engine code. We're using petrol here
         local TypeDef = {
             PistonSpeed = 20,
-            TorqueScale = 1,
-            TorqueCurve = { 0.4, 0.65, 0.85, 1, 0.9, 0.6 },
+            TorqueScale = 0.25,
+            TorqueCurve = { 0, 0.1, 0.2, 0.4, 0.65, 0.85, 1, 0.9, 0.6 },
             Efficiency  = 0.304
         }
         -- ── Layout factors ────────────────────────────────────
@@ -113,18 +163,20 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
 
         -- ── 2. Swept volume and displacement ──────────────────
         -- V_swept (cm³) = π/4 × bore² × stroke
-        -- V_total (L)   = V_swept × Pistons × 0.001
+        -- V_total (cm³) = V_swept × Pistons  -- In cubic centimeters
+        -- V_total (L)   = V_total × 0.001    -- In liters
         local V_swept_cm3 = (PI / 4) * Bore_cm * Bore_cm * Stroke_cm
-        local V_total_L   = V_swept_cm3 * Pistons * 0.001
+        local V_total_cm3 = V_swept_cm3 * Pistons
+        local V_total_L   = V_total_cm3 * 0.001
 
+        -- ── 3. Peak torque via BMEP ───────────────────────────
+        -- T = BMEP_Pa × V_total_m³ / (4π)    [4-stroke cycle]
+        local BMEP_Pa    = TypeDef.TorqueScale * CLASS.BMEP_Scale * 1e5
         -- Wankel rotary: each rotor provides WANKEL_POWER_STROKES combustion
         -- events per shaft revolution instead of the 0.5 of a 4-stroke piston.
         -- BMEP formula stays the same (it's per-displacement), but we apply
         -- the firing-frequency bonus to effective peak torque via VEBonus.
         -- The key difference is captured in BSFCMult and IdleRPMMult.
-        -- ── 3. Peak torque via BMEP ───────────────────────────
-        -- T = BMEP_Pa × V_total_m³ / (4π)    [4-stroke cycle]
-        local BMEP_Pa    = TypeDef.TorqueScale * CLASS.BMEP_Scale * 1e5
         -- Apply volumetric efficiency layout bonus/penalty
         local peakTorque = (BMEP_Pa * (V_total_L * 1e-3) / (4 * PI)) * (1 + (LayoutFactors.VEBonus or 0))
 
@@ -171,11 +223,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- ── 10. Assemble geometric table ────────────────────────────
         local geometric = {
             -- Identity
-            --Layout             = Params.Layout or "inline",
+            Layout             = Params.Layout,
             IsPiston           = true,
-            --IsWankel           = Params.Layout == "wankel",
-            --IsTurbine          = false,
-            --IsElectric         = false,
             BankAngle          = Params.BankAngle,
             BankCount          = Params.BankCount,
             -- Inputs (for HUD / GetStatus)
@@ -183,10 +232,11 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             StrokeCm           = Stroke_cm,
             ClearanceCm        = Clearance_cm,
             Pistons            = Pistons,
+            Sign               = Params.Sign .. Pistons, -- Sign of the engine, e.g: "I4", "V8", "Radial 7"
             -- Derived geometry
             CompressionRatio   = CR,
-            SweptVolPerCyl     = V_swept_cm3 * 0.001,   -- L
-            Displacement       = V_total_L,             -- L
+            SweptVolPerCyl     = V_swept_cm3 * 0.001,    -- In liters
+            Displacement       = {InCubicCentimeters = V_total_cm3, InLiters = V_total_L},
             -- Performance
             PeakTorque         = peakTorque,
             RedlineRPM         = redlineRPM,

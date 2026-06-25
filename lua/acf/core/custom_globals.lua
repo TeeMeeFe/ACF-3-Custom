@@ -1,7 +1,6 @@
 do -- Globals
     ACF.SpeedOfSound = 343 -- In Meters Per Second
-    ACF.RoomTemperature = 293 -- In Degrees Kelvin. This indicates the default temperature of a safezone, if none defined.
-    ACF.AmbientTemperature = 288 -- In Degrees Kelvin. This indicates the default temperature of the whole map, if none defined.
+    ACF.RoomTemperature = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
 end
 
 do -- Update checker
