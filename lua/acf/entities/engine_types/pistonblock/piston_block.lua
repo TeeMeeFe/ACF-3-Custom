@@ -1,4 +1,6 @@
+local ACF = ACF
 local PI = math.pi
+local abs = math.abs
 local clamp = math.Clamp
 local floor = math.floor
 local min = math.min
@@ -88,17 +90,27 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         "ParallelTwinEngine"
     })
 
-     -- ──────────────────────────────────────────────────────────
+    -- ──────────────────────────────────────────────────────────
     --  Torque curve builder (shared by all layouts)
     -- ──────────────────────────────────────────────────────────
-
     --- Expand a normalised TorqueCurve array into a Nm lookup table.
     --- typeCurve: flat array {mult0, mult1, ...} 0-1, evenly spaced over RPM.
     --- @return table  {curve, steps, maxTorque, maxRPM, Sample}
     local function BuildCurve(typeCurve, peakTorque, maxRPM, steps)
+        local POWER_BAND_THRESHOLD = 0.80   -- fraction of peak power that defines the band edges
+        local TWO_PI_OVER_60       = 2 * PI / 60
+        local KWTOHP               = ACF.KwToHp
+        local NMTOFTLB             = ACF.NmToFtLb
+
         steps = steps or 200
         local n      = #typeCurve
         local curve  = {}
+
+        local peakKW          = 0
+        local peakPowerAtRPM  = 0
+        local peakTorqueAtRPM = 0
+
+        local rpmStep = maxRPM / steps
         for i = 0, steps do
             local pos   = (i / steps) * (n - 1)
             local idx0  = floor(pos)
@@ -107,6 +119,20 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             local v0    = typeCurve[idx0 + 1] or 0
             local v1    = typeCurve[idx1 + 1] or 0
             curve[i]    = peakTorque * (v0 + blend * (v1 - v0))
+
+            local torque = curve[i]
+            local rpm    = rpmStep * i
+
+            if torque >= peakTorque then
+                peakTorqueAtRPM = rpm
+            end
+
+            local power = torque * (rpm * TWO_PI_OVER_60) * 0.001
+
+            if power > peakKW then
+                peakKW         = power
+                peakPowerAtRPM = rpm
+            end
         end
 
         local function Sample(rpm)
@@ -120,12 +146,37 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             return v0 + blend * (v1 - v0)
         end
 
-        return { curve = curve,
-                 steps = steps,
-                 maxTorque = peakTorque,
-                 maxRPM = maxRPM,
-                 Sample = Sample }
+        -- Calculate Powerband
+        local powerbandMin = 0
+        local powerbandMax = 0
+
+        local threshold = peakKW * POWER_BAND_THRESHOLD
+
+        for i = 0, steps do
+            local rpm = rpmStep * i
+            local torque = curve[i]
+
+            local power = torque * (rpm * TWO_PI_OVER_60) * 0.001
+
+            if power > threshold then
+                if powerbandMin == 0 then
+                    powerbandMin = rpm
+                end
+
+                powerbandMax = rpm
+            end
+        end
+
+        return {
+            Curve       = curve,
+            Steps       = steps,
+            Sample      = Sample,
+            PeakPower   = {InKW = peakKW, InHP = peakKW * KWTOHP, AtRPM = peakPowerAtRPM},
+            PeakTorque  = {InNm = peakTorque, InFtLb = peakTorque * NMTOFTLB, AtRPM = peakTorqueAtRPM},
+            PowerBand   = {Band = abs(powerbandMax - powerbandMin), Min = powerbandMin, Max = powerbandMax}
+        }
     end
+
 
     --- Must be overridden by each concrete layout.
     --- Returns a flat table of multipliers — see header for field list.
@@ -238,7 +289,6 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             SweptVolPerCyl     = V_swept_cm3 * 0.001,    -- In liters
             Displacement       = {InCubicCentimeters = V_total_cm3, InLiters = V_total_L},
             -- Performance
-            PeakTorque         = peakTorque,
             RedlineRPM         = redlineRPM,
             IdleRPM            = idleRPM,
             BSFC               = BSFC_eff,
@@ -263,11 +313,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             OilSumpTiltWarn    = LayoutFactors.OilSumpTiltWarn   or 50,  -- ° tilt before pressure drops
             OilSumpTiltStarve  = LayoutFactors.OilSumpTiltStarve or 90,  -- ° tilt for full starvation
             -- Curve
-            maxTorque          = ct.maxTorque,
-            maxRPM             = ct.maxRPM,
-            steps              = ct.steps,
-            curve              = ct.curve,
+            Steps              = ct.Steps,
+            Curve              = ct.Curve,
             Sample             = ct.Sample,
+            PeakPower          = ct.PeakPower,
+            PeakTorque         = ct.PeakTorque,
+            PowerBand          = ct.PowerBand,
             }
         return geometric
     end

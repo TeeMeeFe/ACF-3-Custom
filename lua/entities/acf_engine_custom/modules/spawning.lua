@@ -29,6 +29,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	local EngineClass = ResolveType(ClientData.CustomEngineClass, DefaultModel)
 
 	self.ACF = {}
+	self.Class = EngineClass
 	self:SetScaledModel(EngineClass.Model or DefaultModel)
 end
 
@@ -93,14 +94,13 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.HeatCoefficient	= Compute.HeatCoeff
 	self.IdleRPM			= Compute.IdleRPM
 	self.Layout				= Compute.Layout
-	self.MaxRPM 	 		= Compute.maxRPM
-	self.MaxTorque			= Compute.maxTorque
+	self.RedlineRPM   		= Compute.RedlineRPM
 	self.OilSumpTiltStarve  = Compute.OilSumpTiltStarve
 	self.OilSumpTiltWarn    = Compute.OilSumpTiltWarn
 	self.PeakTorque			= Compute.PeakTorque
-	self.PeakPower			= self.PeakTorque * self.MaxRPM  / 9548.8
+	self.PeakPower			= Compute.PeakPower
+	self.PowerBand			= Compute.PowerBand
 	self.Pistons 			= Compute.Pistons
-	self.RedlineRPM   		= Compute.RedlineRPM
 	self.RodRatio			= Compute.RodRatio
 	self.State              = self.State
 	self.Sign 				= Sign
@@ -109,14 +109,14 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.Stroke				= Compute.StrokeCm
 	self.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	self.TorqueSmoothness	= Compute.TorqueSmoothness
-	self.TorqueCurve		= Compute.curve
-	self.TorqueCurve.Steps  = Compute.steps
+	self.TorqueCurve		= Compute.Curve
+	self.TorqueCurve.Steps  = Compute.Steps
 	self.HitBoxes         	= ACF.GetHitboxes(self:GetModel())
 	self.Out              	= ACF.LocalPlane(self:WorldToLocal(self:GetAttachment(self:LookupAttachment("driveshaft")).Pos))
 
 	WireLib.TriggerOutput(self, "State", "idle")
 
-	--PrintTable(Compute)
+	PrintTable(Compute)
 	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
 end
 

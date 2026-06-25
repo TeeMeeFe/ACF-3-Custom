@@ -22,12 +22,12 @@ function ENT:ACF_UpdateOverlayState(State)
     State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))
     State:AddKeyValue("Stroke", ("%s mm"):format(self.Stroke * 10))
     State:AddKeyValue("Compression Ratio", ("%s:1"):format(Round(self.CompressionRatio, 1)))
-    State:AddEnginePower("Power", self.PeakPower)
-    State:AddEngineTorque("Torque", self.PeakTorque)
+    State:AddKeyValue("Power", ("%s kW / %s hp @%s RPM"):format(Round(self.PeakPower.InKW), Round(self.PeakPower.InHP), Round(self.PeakPower.AtRPM)))
+    State:AddKeyValue("Torque", ("%s Nm / %s ft-lb @%s RPM"):format(Round(self.PeakTorque.InNm), Round(self.PeakTorque.InFtLb), Round(self.PeakTorque.AtRPM)))
     -- Unit conversion on the temperature, from Degrees Kelvin to Celcius
-    State:AddKeyValue("Temperature", ("Water: %s°C | Oil: %s°C"):format(self.Temperature.Water - 273.15, self.Temperature.Oil - 273.15))
-    --State:AddKeyValue("Powerband", ("%s - %s RPM"):format(self.PeakMinRPM, self.PeakMaxRPM))
-    --State:AddKeyValue("Redline", ("%s RPM"):format(self.LimitRPM))
+    State:AddKeyValue("Temperature", ("Water: %s°C / Oil: %s°C"):format(self.Temperature.Water - 273.15, self.Temperature.Oil - 273.15))
+    State:AddKeyValue("Powerband", ("%s - %s RPM  Δ%s RPM"):format(Round(self.PowerBand.Min), Round(self.PowerBand.Max), Round(self.PowerBand.Band)))
+    State:AddKeyValue("Redline", ("%s RPM"):format(Round(self.RedlineRPM)))
 end
 
 -------------------------------------------------------------------------------
