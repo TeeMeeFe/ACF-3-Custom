@@ -3,6 +3,8 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
     CLASS.Description  = "A piston engine in a inlined configuration"
     CLASS.Model        = "models/engines/inline4s.mdl"
     CLASS.Layout       = "Inline"
+    CLASS.IsScalable   = true
+    CLASS.Mass         = 100 -- Relative to the Base model size
     CLASS.Sign         = "I"
     -- These attributes would be private if we had actual scaffolding for that
     local __INLINE_BAL = { [2] = 0.72, [3] = 0.78, [4] = 0.84, [5] = 0.88, [6] = 0.96, [7] = 0.98, [8] = 1.00 }

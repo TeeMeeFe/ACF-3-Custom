@@ -5,7 +5,7 @@ local MaxDistance   = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
 
 local Classes       = ACF.Classes
 local Contraption   = ACF.Contraption
-local Notify        = ACF.Utilities.Notify
+--local Notify        = ACF.Utilities.Notify
 
 local ENTITY        = FindMetaTable("Entity")
 local PHYSOBJ       = FindMetaTable("PhysObj")
@@ -27,14 +27,15 @@ local function ResolveType(Value, Default)
 	return Classes.GetTypeByName(Name) or Classes.GetTypeByName(Default)
 end
 
-function ENT:ACF_OnVerifyClientData(ClientData) end
+--function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.ACF = {}
 
-	local EngineClass = ResolveType(ClientData.CustomEngineClass, DefaultModel)
-	local Model = EngineClass.Model
+	--PrintTable({ClientData})
+	local EngineType = ResolveType(ClientData.EngineType, DefaultModel)
+	local Model = EngineType.Model
 
-	self.ACF.Class = EngineClass
+	self.EngineType = EngineType
 	self.ACF.Model = Model
 	self:SetScaledModel(Model or DefaultModel)
 end
@@ -49,7 +50,16 @@ function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 	self.Active        = false
 	self.Gearboxes     = {}
 	self.FuelTanks     = {}
+	self.MassRatio     = 1
 	self.LastThink     = 0
+	self.LastPitch     = 0
+	self.LastTorque    = 0
+	self.LastFuelUsage = 0
+	self.LastPower     = 0
+	self.LastRPM       = 0
+	self.LastTotalMass = 0
+	self.LastPhysMass  = 0
+	self.FuelUsage     = 0
 	self.Layout 	   = ""
 	self.Throttle 	   = 0
 	self.State         = "Idle"
@@ -74,22 +84,23 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 		Clearance = self.Clearance
 	}
 
-	local Sel = ClientData.CustomEngineClass
+	local Sel = ClientData.EngineType
 	local Class = Classes.GetTypeByName(Sel)
 
+	--PrintTable({Sel, Class, ClientData})
 	local LayoutFactors = Class.GetLayoutFactors(self.Pistons)
 	local Compute = Class.Compute(Sel, LayoutFactors, Params)
 
 	local Displacement = Compute.Displacement
-	local Sign    = Compute.Sign
-	local Name 	  = ("%sL %s - %scc"):format(Round(Displacement.InLiters, 1), Sign, Round(Displacement.InCubicCentimeters))
+	local Sign = Compute.Sign
+	local Name = ("%sL %s - %scc"):format(Round(Displacement.InLiters, 1), Sign, Round(Displacement.InCubicCentimeters))
 
 	-- Class compute table assignments
 	self.Name      			= Name
 	self.ShortName 			= Name
 	self.BalanceFactor  	= Compute.BalanceFactor
 	self.BigEndDiam     	= Compute.BigEndDiam_cm
-	self.BlockType	 		= Compute.IsPiston and "Piston" or Compute.IsTurbine and "Turbine" or Compute.IsElectric and "Electrical"
+	self.BlockType	 		= Compute.IsPiston and "Piston" or Compute.IsTurbine and "Turbine" or Compute.IsElectric and "Electric"
 	self.Bore	        	= Compute.BoreCm
 	self.BSFC 				= Compute.BSFC
 	self.CompressionRatio 	= Compute.CompressionRatio
@@ -101,45 +112,90 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.IdleRPM			= Compute.IdleRPM
 	self.Layout				= Compute.Layout
 	self.RedlineRPM   		= Compute.RedlineRPM
-	self.OilSumpTilt  		= {Starve = Compute.OilSumpTiltStarve, Warn = Compute.OilSumpTiltWarn}
+	self.OilSumpTilt  		= Compute.OilSumpTilt
 	self.PeakTorque			= Compute.PeakTorque
 	self.PeakPower			= Compute.PeakPower
 	self.PowerBand			= Compute.PowerBand
 	self.Pistons 			= Compute.Pistons
 	self.RodRatio			= Compute.RodRatio
-	self.State              = self.State
 	self.Sign 				= Sign
 	self.Sample				= Compute.Sample
 	self.SparksPerRev		= Compute.SparksPerRev
 	self.Stroke				= Compute.StrokeCm
 	self.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	self.TorqueSmoothness	= Compute.TorqueSmoothness
-	self.TorqueCurve		= {Values = Compute.Curve, Steps = Compute.Steps}
+	self.TorqueCurve		= Compute.TorqueCurve
+	self.VECurve		    = Compute.VECurve
 	self.HitBoxes         	= ACF.GetHitboxes(self:GetModel())
 	self.Out              	= ACF.LocalPlane(self:WorldToLocal(self:GetAttachment(self:LookupAttachment("driveshaft")).Pos), Vector(1, 0, 0))
 
-	WireLib.TriggerOutput(self, "State", "idle")
-
 	--PrintTable(Compute)
-	Notify.NoticeToPlayer(Owner, "Attempt to create entity was successful!")
+	WireLib.TriggerOutput(self, "State", "Idle")
+end
+
+function ENT:ACF_OnUpdateEntityData()
+	--PrintTable(self.ACF_LiveData)
+	print("Ran ENT:ACF_OnUpdateEntityData()")
+end
+
+function ENT:ACF_PostUpdateEntityData(ClientData)
+	--PrintTable(self.ACF_LiveData)
+	if self.Active then return false, "Turn off the engine before updating it!" end -- TODO: Localize me!
+	local Feedback = ""
+
+	-- These are just placeholders for now as this code below is straight up stripped from the old engine Update function
+	if next(self.Gearboxes) then
+		local Count, Total = 0, 0
+
+		for Gearbox in pairs(self.Gearboxes) do
+			self:Unlink(Gearbox)
+
+			local Result = self:Link(Gearbox)
+
+			if not Result then Count = Count + 1 end
+
+			Total = Total + 1
+		end
+
+		if Count == Total then
+			Feedback = Feedback .. "\nUnlinked all gearboxes due to excessive driveshaft angle." -- TODO: Localize me!
+		elseif Count > 0 then
+			local Text = Feedback .. "\nUnlinked %s out of %s gearboxes due to excessive driveshaft angle." -- TODO: Localize me!
+
+			Feedback = Text:format(Count, Total)
+		end
+	end
+
+	if next(self.FuelTanks) then
+		local Count, Total = 0, 0
+
+		for Tank in pairs(self.FuelTanks) do
+			if not self.FuelTypes[Tank.FuelType] then
+				self:Unlink(Tank)
+
+				Count = Count + 1
+			end
+
+			Total = Total + 1
+		end
+
+		if Count == Total then
+			Feedback = Feedback .. "\nUnlinked all fuel tanks due to fuel type change." -- TODO: Localize me!
+		elseif Count > 0 then
+			local Text = Feedback .. "\nUnlinked %s out of %s fuel tanks due to fuel type change." -- TODO: Localize me!
+
+			Feedback = Text:format(Count, Total)
+		end
+	end
+
+	return true, "Engine updated successfully!" .. Feedback
 end
 
 function ENT:PostEntityPaste(_, _, CreatedEntities)
 	print("Ran ENT:PostEntityPaste()")
 end
 
-function ENT:ACF_OnUpdateEntityData()
-	PrintTable(self.ACF_LiveData)
-	print("Ran ENT:ACF_OnUpdateEntityData()")
-end
-
-function ENT:ACF_PostUpdateEntityData()
-	print(self.ACF_GetUserVar("BlockType"))
-	print(self.ACF_GetUserVar("FuelType"))
-	PrintTable(self.ACF_LiveData)
-	print("Ran ENT:ACF_PostUpdateEntityData()")
-end
-
+-- Are these even necessary?
 ACF.RegisterLinkSource("acf_engine_custom", "Gearboxes")
 ACF.RegisterLinkSource("acf_engine_custom", "FuelTanks")
 

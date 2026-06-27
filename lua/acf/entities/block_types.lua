@@ -23,4 +23,6 @@
 ACF.Classes.DefineClass("ACF.Engines.BlockType", function()
     CLASS.Name          = "Block Type Class"
     CLASS.Description   = "The base class for any and all types of engine blocks."
+
+    FIELD("ACF.Engines.BlockType", "BlockType", {"PistonBlock", "ElectricBlock", "TurbineBlock"})
 end)

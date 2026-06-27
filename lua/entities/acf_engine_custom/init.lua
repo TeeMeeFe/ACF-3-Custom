@@ -10,6 +10,7 @@ ENT.ACF_HealthUpdatesWireOverlay  = true
 include("modules/linking.lua")
 include("modules/spawning.lua")
 include("modules/state.lua")
+include("modules/cfw.lua")
 include("modules/sounds.lua")
 include("modules/overlay.lua")
 include("modules/networking.lua")
