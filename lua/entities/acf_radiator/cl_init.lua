@@ -54,6 +54,7 @@ do	-- Overlay
         render.SetColorMaterial()
 
         if IsValid(SelfTbl.Engine) then
+            local E = SelfTbl.Engine
             local Pos, Ang, Mins, Maxs = E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs()
 
             render.DrawWireframeBox(Pos, Ang, Mins, Maxs, EngineColor, true)

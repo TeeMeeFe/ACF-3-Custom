@@ -2,7 +2,7 @@
 --local Round = math.Round
 
 function ENT:ACF_UpdateOverlayState(State)
-    if self:CanConsume() then
+    if self.Active then
         State:AddSuccess("Active")
     else
         State:AddWarning("Idle")

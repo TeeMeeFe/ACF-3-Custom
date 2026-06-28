@@ -32,6 +32,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 end
 
 function ENT:ACF_OnSpawn()
+    self.Active          = false
     self.Engine          = nil
     self.IsLeaking       = false
     self.LeakingRate     = 0
@@ -51,6 +52,7 @@ function ENT:ACF_PostSpawn(_, _, _, ClientData)
     self:SetScale(self.ACF.Scale)
     -- Radiators should be active by default.
     self:TriggerInput("Active", 1)
+    self.Active = true
     WireLib.TriggerOutput(self, "Entity", self)
     WireLib.TriggerOutput(self, "Temperature", self.Temperature)
 end
@@ -92,8 +94,9 @@ do	-- NET SURFER 2.0
 
         if IsValid(Entity) then
             if IsValid(Entity.Engine) then
-                EngineEntity = Entity.Engine:EntIndex()
+                EngineEntity = Entity.Engine
             end
+
             net.Start("ACF_RequestRadiatorInfo")
                 net.WriteEntity(Entity)
                 net.WriteEntity(EngineEntity)

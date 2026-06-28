@@ -170,8 +170,8 @@ do	-- Overlay
 		-- Same here but for radiators
 		if next(SelfTbl.Radiators) then
 			for _, R in ipairs(SelfTbl.Radiators) do
-				local E = R.EnterVehicle
-				if IsValid(R) then
+				local E = R.Ent
+				if IsValid(E) then
 					render.DrawWireframeBox(E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs(), RadiatorColor, true)
 					render.DrawBox(E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs(), RadiatorColor)
 				end

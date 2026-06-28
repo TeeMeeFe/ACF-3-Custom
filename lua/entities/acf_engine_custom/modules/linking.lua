@@ -104,7 +104,7 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_radiator", function(Engine, Targ
     -- TODO: Set any other custom linking restrictions here
 
     Engine.Radiators[Target] = true
-    Target.Engine = true
+    Target.Engine = Engine
 
     Engine:UpdateOverlay()
     Target:UpdateOverlay()
