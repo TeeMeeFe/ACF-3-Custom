@@ -8,3 +8,4 @@ ENT.ACF_UserWeighable             = false
 ENT.ACF_HealthUpdatesWireOverlay  = true
 
 include("modules/spawning.lua")
+include("modules/overlay.lua")

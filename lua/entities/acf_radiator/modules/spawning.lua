@@ -24,26 +24,21 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
     self.ACF = {}
 
     local ShapeClass = ResolveType(ClientData.RadiatorType)
-    self.ACF.ID = ShapeClass
-
-    if not istable(ShapeClass) and not ShapeClass.Type then
-        ShapeClass = Classes.GetTypeByName(ShapeClass)
-    end
-
+    ShapeClass = Classes.GetTypeByName(ShapeClass)
     local Model = ShapeClass.Model
-    local Scale = ClientData.RadiatorScale
 
     self.ACF.Model = Model
-    self.ACF.Scale = Scale
     self:SetScaledModel(self.ACF.Model)
 end
 
 function ENT:ACF_OnSpawn()
-    self.Engine        = nil
-    self.Leaking       = 0
-    self.LastThink     = 0
-    self.LastAmount    = 0
-    self.LastActivated = 0
+    self.Engine          = nil
+    self.IsLeaking       = false
+    self.LeakingRate     = 0
+    self.LastThink       = 0
+    self.LastTemperature = 0
+    self.LastAmount      = 0
+    self.LastActivated   = 0
 
     duplicator.ClearEntityModifier(self, "mass")
 
@@ -51,11 +46,13 @@ function ENT:ACF_OnSpawn()
 end
 
 function ENT:ACF_PostSpawn(_, _, _, ClientData)
-    self:SetScale(self.ACF.Scale)
+    self.Temperature = ACF.AmbientTemperature -- In Degrees Kelvin.
 
+    self:SetScale(self.ACF.Scale)
     -- Radiators should be active by default.
     self:TriggerInput("Active", 1)
     WireLib.TriggerOutput(self, "Entity", self)
+    WireLib.TriggerOutput(self, "Temperature", self.Temperature)
 end
 
 ACF.RegisterLinkSource("acf_radiator", "Engine")

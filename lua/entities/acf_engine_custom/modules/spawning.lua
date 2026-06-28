@@ -200,6 +200,30 @@ ACF.RegisterLinkSource("acf_engine_custom", "Gearboxes")
 ACF.RegisterLinkSource("acf_engine_custom", "FuelTanks")
 ACF.RegisterLinkSource("acf_engine_custom", "Radiators")
 
+-- Remove-only teardown. Captured by AutoRegisterV2 as OrigOnRemove; the generated OnRemove still
+-- runs ACF_OnEntityLast + WireLib cleanup around this.
+function ENT:OnRemove(IsFullUpdate)
+	if IsFullUpdate then return end
+
+	--hook.Run("ACF_OnEntityLast", "acf_engine", self, Class) -- Maybe its not needed anymore?
+
+	-- self:DestroySound() -- Don't have this yet
+
+	for Gearbox in pairs(self.Gearboxes) do
+		self:Unlink(Gearbox)
+	end
+
+	for Tank in pairs(self.FuelTanks) do
+		self:Unlink(Tank)
+	end
+
+	for Radiator in pairs(self.Radiators) do
+		self:Unlink(Radiator)
+	end
+
+	--TimerRemove("ACF Engine Clock " .. self:EntIndex()) -- Not yet...
+end
+
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:
 	ENT.ACF.PhysObj defined when spawned

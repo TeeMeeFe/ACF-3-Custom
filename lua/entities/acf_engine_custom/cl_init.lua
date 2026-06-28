@@ -10,8 +10,7 @@ end
 
 do	-- NET SURFER 2.0
 	net.Receive("ACF_InvalidateEngineInfo", function()
-		local Engine	= net.ReadEntity()
-
+		local Engine = net.ReadEntity()
 		if not IsValid(Engine) then return end
 
 		Engine.HasData	= false
@@ -22,8 +21,10 @@ do	-- NET SURFER 2.0
 		local Driveshaft	= net.ReadVector()
 		local Outputs		= {}
 		local Fuel			= {}
+		local Rads     		= {}
 		local OutputLen		= net.ReadUInt(6)
 		local FuelLen		= net.ReadUInt(6)
+		local RadsLen       = net.ReadUInt(6)
 
 		if OutputLen > 0 then
 			for I = 1, OutputLen do
@@ -37,8 +38,15 @@ do	-- NET SURFER 2.0
 			end
 		end
 
+		if RadsLen > 0 then
+			for I = 1, RadsLen do
+				Rads[I] = net.ReadUInt(MAX_EDICT_BITS)
+			end
+		end
+
 		local OutEnts	= {}
 		local FuelTanks	= {}
+		local Radiators = {}
 
 		for _, E in ipairs(Outputs) do
 			local Ent = Entity(E)
@@ -58,8 +66,17 @@ do	-- NET SURFER 2.0
 			end
 		end
 
+		for _, E in ipairs(Rads) do
+			local Ent = Entity(E)
+
+			if IsValid(Ent) then
+				Radiators[#Radiators + 1] = {Ent = Ent}
+			end
+		end
+
 		Engine.Outputs		= OutEnts
 		Engine.FuelTanks	= FuelTanks
+		Engine.Radiators    = Radiators
 		Engine.Driveshaft	= Driveshaft
 
 		Engine.HasData	= true
@@ -124,7 +141,8 @@ do	-- Overlay
 		render.DrawSphere(OutPos, Rad, 4, 3, source)
 	end
 
-	local FuelColor	= Color(255, 255, 0, 25)
+	local FuelColor		= Color(255, 255, 0, 25)
+	local RadiatorColor = Color(25, 75, 255, 25)
 
 	function ENT:DrawOverlay()
 		local SelfTbl = self:GetTable()
@@ -138,12 +156,24 @@ do	-- Overlay
 
 		render.SetColorMaterial()
 
+		-- Get the fueltank entity and render a box containing its shape
 		if next(SelfTbl.FuelTanks) then
 			for _, T in ipairs(SelfTbl.FuelTanks) do
 				local E = T.Ent
 				if IsValid(E) then
 					render.DrawWireframeBox(E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs(), FuelColor, true)
 					render.DrawBox(E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs(), FuelColor)
+				end
+			end
+		end
+
+		-- Same here but for radiators
+		if next(SelfTbl.Radiators) then
+			for _, R in ipairs(SelfTbl.Radiators) do
+				local E = R.EnterVehicle
+				if IsValid(R) then
+					render.DrawWireframeBox(E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs(), RadiatorColor, true)
+					render.DrawBox(E:GetPos(), E:GetAngles(), E:OBBMins(), E:OBBMaxs(), RadiatorColor)
 				end
 			end
 		end

@@ -1,4 +1,5 @@
 local ACF      		 = ACF
+local IsEntityValid  = ACF.Optimizations.IsEntityValid
 local Mobility       = ACF.Mobility
 local MobilityObj    = Mobility.Objects
 local MaxDistance    = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
@@ -97,6 +98,8 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_radiator", function(Engine, Targ
     if Engine.Radiators[Target] then return false, "This engine is already linked to this radiator!" end
     if Target.Engine == Engine then return false, "This engine is already linked to this radiator!" end
     if Engine:GetPos():DistToSqr(Target:GetPos()) > MaxRadDistance then return false, "The radiator is too far away from this engine!" end
+    -- Radiators can only link to 1 engine but engines can link to N radiators(1:N cardinality)
+    if IsEntityValid(Target.Engine) and Target.Engine ~= Engine then return false, "The radiator is already linked to another engine!" end
 
     -- TODO: Set any other custom linking restrictions here
 

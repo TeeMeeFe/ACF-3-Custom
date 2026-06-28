@@ -17,6 +17,7 @@ net.Receive("ACF_RequestEngineInfo", function(_, Ply)
     if IsEntityValid(Entity) then
         local Outputs    = {}
         local FuelTanks  = {}
+        local Radiators  = {}
         local Driveshaft = Entity.Out.Pos
 
         if next(Entity.Gearboxes) then
@@ -31,11 +32,18 @@ net.Receive("ACF_RequestEngineInfo", function(_, Ply)
             end
         end
 
+        if next(Entity.Radiators) then
+            for E in pairs(Entity.Radiators) do
+                Radiators[#Radiators + 1] = E:EntIndex()
+            end
+        end
+
         net.Start("ACF_RequestEngineInfo")
             net.WriteEntity(Entity)
             net.WriteVector(Driveshaft)
             net.WriteUInt(#Outputs, 6)
             net.WriteUInt(#FuelTanks, 6)
+            net.WriteUInt(#Radiators, 6)
 
             if next(Outputs) then
                 for _, E in ipairs(Outputs) do
@@ -45,6 +53,12 @@ net.Receive("ACF_RequestEngineInfo", function(_, Ply)
 
             if next(FuelTanks) then
                 for _, E in ipairs(FuelTanks) do
+                    net.WriteUInt(E, MAX_EDICT_BITS)
+                end
+            end
+
+            if next(Radiators) then
+                for _, E in ipairs(Radiators) do
                     net.WriteUInt(E, MAX_EDICT_BITS)
                 end
             end
