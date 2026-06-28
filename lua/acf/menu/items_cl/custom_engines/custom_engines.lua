@@ -14,4 +14,4 @@ local function CreateMenu(Menu)
     Classes.CreateTypeSelector(Menu, EntityClassDef, "BlockType")
 end
 
-ACF.AddMenuItem(299, "#acf.menu.entities", "Custom Engines", "car", CreateMenu)
+ACF.AddMenuItem(299, "#acf.menu.entities", "Custom Engines", "car_add", CreateMenu)

@@ -1,7 +1,8 @@
-local ACF      		= ACF
-local Mobility      = ACF.Mobility
-local MobilityObj   = Mobility.Objects
-local MaxDistance   = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
+local ACF      		 = ACF
+local Mobility       = ACF.Mobility
+local MobilityObj    = Mobility.Objects
+local MaxDistance    = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
+local MaxRadDistance = ACF.RadiatorLinkDistance * ACF.RadiatorLinkDistance
 
 ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank", function(Engine, Target)
     if Engine.FuelTanks[Target] then return false, "This engine is already linked to this fuel tank!" end
@@ -83,6 +84,40 @@ ACF.RegisterClassUnlink("acf_engine_custom", "acf_gearbox", function(Engine, Tar
 
     Engine.Gearboxes[Target] = nil
     Target.Engines[Engine]	 = nil
+
+    Engine:UpdateOverlay()
+    Target:UpdateOverlay()
+
+    Engine:InvalidateClientInfo()
+
+    return true, "Engine unlinked successfully!"
+end)
+
+ACF.RegisterClassLink("acf_engine_custom", "acf_radiator", function(Engine, Target)
+    if Engine.Radiators[Target] then return false, "This engine is already linked to this radiator!" end
+    if Target.Engine == Engine then return false, "This engine is already linked to this radiator!" end
+    if Engine:GetPos():DistToSqr(Target:GetPos()) > MaxRadDistance then return false, "The radiator is too far away from this engine!" end
+
+    -- TODO: Set any other custom linking restrictions here
+
+    Engine.Radiators[Target] = true
+    Target.Engine = true
+
+    Engine:UpdateOverlay()
+    Target:UpdateOverlay()
+
+    Target:InvalidateClientInfo()
+
+    return true, "Engine linked successfully!"
+end)
+
+ACF.RegisterClassUnlink("acf_engine_custom", "acf_radiator", function(Engine, Target)
+    if not Engine.Radiators[Target] then
+        return false, "This engine is not linked to this radiator."
+    end
+
+    Engine.Radiators[Target] = nil
+    Target.Engine = nil
 
     Engine:UpdateOverlay()
     Target:UpdateOverlay()

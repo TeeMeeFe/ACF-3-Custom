@@ -16,7 +16,7 @@ local Round = math.Round
 local Floor = math.floor
 local Abs   = math.abs
 
-local DefaultModel = "ACF.Engines.PistonBlock.DefaultModel"
+local DefaultModel = ("ACF.Engines.PistonBlock").DefaultModel
 
 -- Engines should have these states: IDLE, STARTING, ACTIVE, STALLING
 -- Old engines had ACTIVE, IDLE. 
@@ -50,6 +50,7 @@ function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 	self.Active        = false
 	self.Gearboxes     = {}
 	self.FuelTanks     = {}
+	self.Radiators     = {}
 	self.MassRatio     = 1
 	self.LastThink     = 0
 	self.LastPitch     = 0
@@ -195,9 +196,9 @@ function ENT:PostEntityPaste(_, _, CreatedEntities)
 	print("Ran ENT:PostEntityPaste()")
 end
 
--- Are these even necessary?
 ACF.RegisterLinkSource("acf_engine_custom", "Gearboxes")
 ACF.RegisterLinkSource("acf_engine_custom", "FuelTanks")
+ACF.RegisterLinkSource("acf_engine_custom", "Radiators")
 
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:

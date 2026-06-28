@@ -1,6 +1,7 @@
 do -- Globals
-    ACF.SpeedOfSound = 343 -- In Meters Per Second
-    ACF.RoomTemperature = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
+    ACF.SpeedOfSound         = 343    -- In Meters Per Second
+    ACF.RoomTemperature      = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
+    ACF.RadiatorLinkDistance = 96     -- Distance in inches at which linking radiators are possible.
 end
 
 do -- Update checker
