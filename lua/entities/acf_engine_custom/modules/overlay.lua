@@ -1,21 +1,14 @@
-local ACF = ACF
 local Round = math.Round
-
-ACF.AddInputAction("acf_engine_custom", "Throttle", function(Entity, Value)
-    Entity.Throttle = Clamp(Value, 0, 100) * 0.01
-end)
-
-ACF.AddInputAction("acf_engine_custom", "Active", function(Entity, Value)
-    SetActive(Entity, tobool(Value), Entity:GetTable())
-end)
-
--------------------------------------------------------------------------------
 
 ENT.OverlayDelay = 0.1
 
 function ENT:ACF_UpdateOverlayState(State)
     State:AddHeader(self.Name, 2)
-    _ = self.State == "active" and State:AddSuccess(self.State) or State:AddWarning(self.State) -- Fucked up pattern
+    if self.State == "Active" then
+        State:AddSuccess(self.State)
+    else
+        State:AddWarning(self.State)
+    end
     -- Unit conversion on bore and stroke, from Centimeters to Millimeters
     State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))
     State:AddKeyValue("Stroke", ("%s mm"):format(self.Stroke * 10))
@@ -27,5 +20,3 @@ function ENT:ACF_UpdateOverlayState(State)
     State:AddKeyValue("Powerband", ("%s - %s RPM  Δ%s RPM"):format(Round(self.PowerBand.Min), Round(self.PowerBand.Max), Round(self.PowerBand.Band)))
     State:AddKeyValue("Redline", ("%s RPM"):format(Round(self.RedlineRPM)))
 end
-
--------------------------------------------------------------------------------

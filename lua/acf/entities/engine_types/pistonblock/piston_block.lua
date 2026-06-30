@@ -236,6 +236,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local DIESEL_LIMIT_S    = 0.70   -- RPM fraction where diesel VE starts to be throttled
         local DIESEL_LIMIT_E    = 0.86   -- RPM fraction where diesel VE suppression is full
         local DIESEL_SUPPRESS   = 0.35   -- Max fractional VE loss at the diesel RPM limit
+        local RUNNER_REF_CM     = 22.0
+        local RUNNER_SHIFT_K    = 0.0025   -- RPM-fraction shift per cm of runner length difference
 
         --- Computes a normalised volumetric-efficiency curve (0–1 values, peak = 1)
         --- from physical valve-train, intake, exhaust, and fuel-delivery parameters.
@@ -281,8 +283,11 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             local head = HEAD_SHAPE[headType] or HEAD_SHAPE.ohc
             local cam  = CAM_MOD[camProfile]  or CAM_MOD.stock
 
-            -- Cam shift moves both the fall onset and the zero point
-            local fall_start  = head.fall_start + cam.shift
+            -- Runner length shifts the plateau onset: long runners bias toward low RPM,
+            -- short runners bias toward high RPM.
+            local runner_shift = (RUNNER_REF_CM - (runnerLen_cm or RUNNER_REF_CM)) * RUNNER_SHIFT_K
+
+            local fall_start = head.fall_start + cam.shift + runner_shift
             local fall_width  = (head.fall_end - head.fall_start) / cam.fall_k
             local fall_end    = fall_start + fall_width
             local rise_end    = head.rise_end   -- rise is not shifted by cam
@@ -413,7 +418,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- m_piston (kg) = PistonMass_K × bore_cm²
         -- Combined (inline): Pistons × PistonMass_K × bore² × stroke² × 1e-3
         -- Scaled by InertiaFactor for layout differences.
-        local I_base = Pistons * CLASS.PistonMass_K * Bore_cm * Bore_cm * Stroke_cm * Stroke_cm * 1e-3
+        local I_base = Pistons * CLASS.PistonMass_K * Bore_cm * Bore_cm * Stroke_cm * Stroke_cm * 0.1 -- 0.1 as 0.001 was having no inertia at all
         local inertia = I_base * (LayoutFactors.InertiaFactor or 1.0)
 
         -- ── 9. Torque curve — derived from physical parameters ───

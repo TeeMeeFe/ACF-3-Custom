@@ -19,7 +19,7 @@ end, "Custom Engine", "Custom Engines")
 
 ENT.ACF_StaticWireInputs = {
     "Active (If set to a non-zero value, it'll attempt to start the engine.)",
-    "Throttle (On a range from 0 to 100, defines how much power will be given to the engine.)"
+    "Throttle (On a range from 0 to 1, defines how much power will be given to the engine.)"
 }
 
 ENT.ACF_StaticWireOutputs = {

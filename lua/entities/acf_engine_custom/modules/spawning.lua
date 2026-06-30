@@ -1,20 +1,8 @@
-local ACF      		= ACF
-local Mobility      = ACF.Mobility
-local MobilityObj   = Mobility.Objects
-local MaxDistance   = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
+local ACF     = ACF
+local Classes = ACF.Classes
+local Round   = math.Round
 
-local Classes       = ACF.Classes
-local Contraption   = ACF.Contraption
---local Notify        = ACF.Utilities.Notify
-
-local ENTITY        = FindMetaTable("Entity")
-local PHYSOBJ       = FindMetaTable("PhysObj")
-local VECTOR        = FindMetaTable("Vector")
-
--- Math Constants
-local Round = math.Round
-local Floor = math.floor
-local Abs   = math.abs
+local TimerRemove  = timer.Remove
 
 local DefaultModel = ("ACF.Engines.PistonBlock").DefaultModel
 
@@ -47,36 +35,41 @@ function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 	local Stroke 	= ClientData.CustomEngineStroke or 0
 	local Clearance = ClientData.CustomEngineClearance or 0
 
-	self.Active        = false
-	self.Gearboxes     = {}
-	self.FuelTanks     = {}
-	self.Radiators     = {}
-	self.MassRatio     = 1
-	self.LastThink     = 0
-	self.LastPitch     = 0
-	self.LastTorque    = 0
-	self.LastFuelUsage = 0
-	self.LastPower     = 0
-	self.LastRPM       = 0
-	self.LastTotalMass = 0
-	self.LastPhysMass  = 0
-	self.FuelUsage     = 0
-	self.Layout 	   = ""
-	self.Throttle 	   = 0
-	self.State         = "Idle"
-	self.SoundBanks    = {}
-	self.Temperature   = {Water = ACF.AmbientTemperature, Oil = ACF.AmbientTemperature}
-	self.Pistons 	   = Pistons
-	self.Bore          = Bore
-	self.Stroke        = Stroke
-	self.Clearance     = Clearance
+	self.Active        		= false
+	self.ExhaustEntity 		= nil
+	self.Gearboxes     		= {}
+	self.FuelTanks     		= {}
+	self.Radiators     		= {}
+	self.MassRatio     		= 1
+	self.LastThink     		= 0
+	self.LastTorque    		= 0
+	self.LastFuelUsage 		= 0
+	self.LastPower     		= 0
+	self.LastRPM       		= 0
+	self.LastTotalMass 		= 0
+	self.LastPhysMass  		= 0
+	self.LastState 			= ""
+	self.LastPitch     		= 0
+	self.SoundPath     		= "vehicles/junker/jnk_fourth_cruise_loop2.wav" -- Placeholder for now
+	self.FuelUsage     		= 0
+	self.Layout 	   		= ""
+	self.Throttle 	   		= 0
+	self.IsStalled		    = false
+	self.State         		= "Idle"
+	self.SoundBanks    		= {}
+	self.RevLimiterEnabled 	= true
+	self.Temperature   		= {Water = ACF.AmbientTemperature, Oil = ACF.AmbientTemperature}
+	self.Pistons 	   		= Pistons
+	self.Bore          		= Bore
+	self.Stroke        		= Stroke
+	self.Clearance     		= Clearance
 
 	duplicator.ClearEntityModifier(self, "mass")
 end
 
 function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
-	Contraption.SetMass(self, 100) -- We later get the mass of the contraption
-	duplicator.StoreEntityModifier(self, "mass", { Mass = 100 })
+	--Contraption.SetMass(self, self.Mass) -- We later get the mass of the contraption
+	--duplicator.StoreEntityModifier(self, "mass", { Mass = 100 })
 
 	local Params = {
 		Pistons   = self.Pistons,
@@ -106,11 +99,14 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.BSFC 				= Compute.BSFC
 	self.CompressionRatio 	= Compute.CompressionRatio
 	self.Clearance      	= Compute.ClearanceCm
+	self.DefaultSound       = self.SoundPath
 	self.Displacement 		= Displacement
 	self.FiringIrregularity = Compute.FiringIrregularity
 	self.FlywheelInertia 	= Compute.FlywheelInertia
+	self.FlyRPM				= 0
 	self.HeatCoefficient	= Compute.HeatCoeff
 	self.IdleRPM			= Compute.IdleRPM
+	self.IsStalled			= false
 	self.Layout				= Compute.Layout
 	self.RedlineRPM   		= Compute.RedlineRPM
 	self.OilSumpTilt  		= Compute.OilSumpTilt
@@ -119,6 +115,9 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.PowerBand			= Compute.PowerBand
 	self.Pistons 			= Compute.Pistons
 	self.RodRatio			= Compute.RodRatio
+	self.RevLimited			= false
+	self.SoundPitch         = self.Pitch or 1
+	self.SoundVolume        = self.SoundVolume or 1
 	self.Sign 				= Sign
 	self.Sample				= Compute.Sample
 	self.SparksPerRev		= Compute.SparksPerRev
@@ -126,11 +125,12 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	self.TorqueSmoothness	= Compute.TorqueSmoothness
 	self.TorqueCurve		= Compute.TorqueCurve
+	self.Torque             = 0
 	self.VECurve		    = Compute.VECurve
 	self.HitBoxes         	= ACF.GetHitboxes(self:GetModel())
 	self.Out              	= ACF.LocalPlane(self:WorldToLocal(self:GetAttachment(self:LookupAttachment("driveshaft")).Pos), Vector(1, 0, 0))
 
-	--PrintTable(Compute)
+	PrintTable(Compute)
 	WireLib.TriggerOutput(self, "State", "Idle")
 end
 
@@ -140,7 +140,6 @@ function ENT:ACF_OnUpdateEntityData()
 end
 
 function ENT:ACF_PostUpdateEntityData(ClientData)
-	--PrintTable(self.ACF_LiveData)
 	if self.Active then return false, "Turn off the engine before updating it!" end -- TODO: Localize me!
 	local Feedback = ""
 
@@ -192,8 +191,49 @@ function ENT:ACF_PostUpdateEntityData(ClientData)
 	return true, "Engine updated successfully!" .. Feedback
 end
 
-function ENT:PostEntityPaste(_, _, CreatedEntities)
-	print("Ran ENT:PostEntityPaste()")
+function ENT:PostEntityPaste(Player, Ent, CreatedEntities)
+	--[[local EntMods = Ent.EntityMods
+
+	-- Backwards compatibility
+	if EntMods.GearLink then
+		local Entities = EntMods.GearLink.entities
+
+		for _, EntID in ipairs(Entities) do
+			self:Link(CreatedEntities[EntID])
+		end
+
+		EntMods.GearLink = nil
+	end
+
+	-- Backwards compatibility
+	if EntMods.FuelLink then
+		local Entities = EntMods.FuelLink.entities
+
+		for _, EntID in ipairs(Entities) do
+			self:Link(CreatedEntities[EntID])
+		end
+
+		EntMods.FuelLink = nil
+	end
+
+	if EntMods.ACFGearboxes then
+		for _, EntID in ipairs(EntMods.ACFGearboxes) do
+			self:Link(CreatedEntities[EntID])
+		end
+
+		EntMods.ACFGearboxes = nil
+	end
+
+	if EntMods.ACFFuelTanks then
+		for _, EntID in ipairs(EntMods.ACFFuelTanks) do
+			self:Link(CreatedEntities[EntID])
+		end
+
+		EntMods.ACFFuelTanks = nil
+	end
+
+	--Wire dupe info
+	self.BaseClass.PostEntityPaste(self, Player, Ent, CreatedEntities)]]--
 end
 
 ACF.RegisterLinkSource("acf_engine_custom", "Gearboxes")
@@ -205,9 +245,7 @@ ACF.RegisterLinkSource("acf_engine_custom", "Radiators")
 function ENT:OnRemove(IsFullUpdate)
 	if IsFullUpdate then return end
 
-	--hook.Run("ACF_OnEntityLast", "acf_engine", self, Class) -- Maybe its not needed anymore?
-
-	-- self:DestroySound() -- Don't have this yet
+	self:DestroySound() -- Don't have this yet
 
 	for Gearbox in pairs(self.Gearboxes) do
 		self:Unlink(Gearbox)
@@ -221,7 +259,7 @@ function ENT:OnRemove(IsFullUpdate)
 		self:Unlink(Radiator)
 	end
 
-	--TimerRemove("ACF Engine Clock " .. self:EntIndex()) -- Not yet...
+	TimerRemove("ACF Engine Clock " .. self:EntIndex())
 end
 
 --[[ ACF Legality Check
