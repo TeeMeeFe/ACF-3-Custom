@@ -1,0 +1,1 @@
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.FuelType", function() end)

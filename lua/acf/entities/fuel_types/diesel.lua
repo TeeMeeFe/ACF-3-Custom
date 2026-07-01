@@ -1,6 +1,7 @@
-ACF.Classes.DefineClass("ACF.FuelTypes.CustomDiesel", "ACF.FuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.Diesel", "ACF.CustomFuelTypes.FuelType", function()
     CLASS.Name         = "Diesel Fuel"
     CLASS.ShortName    = "Diesel"
+    CLASS.ID           = "Diesel"
     CLASS.Density      = 0.745  -- kg/L
     CLASS.IgnitionType = "glow" -- Ignition through compression; glow plugs required for cold start
     CLASS.Efficiency   = 0.243  -- kg/kWh (up to 0.274 at best efficiency)

@@ -34,7 +34,11 @@ ENT.ACF_StaticWireOutputs = {
     "Entity (The engine itself.) [ENTITY]",
 }
 
--- Returns the engine instance backing this entity.
-function ENT:GetEngine()
-    return self:ACF_GetUserVar("Engine")
+
+-- This doesn't work, as we only get the inmediate BlockType class defined above,
+-- but not its children till the very last one with all the field info we need :(
+-- Returns the blocktype instance backing this entity.
+--[[function ENT:GetBlockType()
+    return self:ACF_GetUserVar("BlockType")
 end
+]]

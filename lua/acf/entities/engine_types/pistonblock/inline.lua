@@ -1,3 +1,9 @@
+local ACF         = ACF
+local Classes     = ACF.Classes
+local TankSize    = Vector()
+
+local GetType = Classes.GetTypeByName
+
 ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", function()
     CLASS.Name         = "Inline Engine"
     CLASS.Description  = "A piston engine in a inlined configuration"
@@ -37,7 +43,7 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
         Params.Sign   = CLASS.Sign
 
         -- The base class has the implementation of this method, so we redict this info there instead
-        local BaseClass = ACF.Classes.GetBaseClass(CLASS)
+        local BaseClass = Classes.GetBaseClass(CLASS)
         local Computed = BaseClass.Compute(CLASS, Layout, Params)
 
         return Computed
@@ -141,14 +147,183 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
         CRLabel = EngineConfig:AddLabel("Compression Ratio: " .. ToString(Round(1 + NestedData.CustomEngineStroke / NestedData.CustomEngineClearance, 2)))
         UpdateCRLabel()
 
+        -- Fuel config labels and stuff 
         local FuelConfig = SubMenu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")
-        local EntityClassDef = ACF.Classes.GetTypeByName("acf_fueltank")
-        local FuelTypeSelector = ACF.Classes.CreateTypeSelector(FuelConfig, EntityClassDef, "FuelType")
-        local ClassList = FuelTypeSelector.ComboBox
+        local EngineClass = FuelConfig:AddComboBox()
+        -- For some reason its failing to list either petrol or diesel fuel types.
+        EngineClass:AddChoice("Diesel Engine", "ACF.CustomEngineTypes.GenericDiesel")
+        EngineClass:AddChoice("Petrol Engine", "ACF.CustomEngineTypes.GenericPetrol")
+        EngineClass:SetValue("Petrol Engine") -- Filthy fucking hack, i hate this
+        timer.Simple(0, function() if IsValid(EngineClass) then EngineClass:OnSelect(nil, nil, "ACF.CustomEngineTypes.GenericPetrol") end end) -- smh
 
-        if ClassList and ClassList.Selected then
-            local TypeName = ACF.Classes.GetTypeName(ClassList.Selected)
-            ACF.SetClientData("FuelType", TypeName)
+        local FuelType = FuelConfig:AddComboBox()
+        --=========================================================================--
+        -- RIGHT BELOW THIS CODE IS STRAIGHT UP COPIED FROM engines.lua MENU CODE  --
+        --=========================================================================--
+
+        -- Shape selector. The combo value is the ContainerShapes class FQN written straight into the
+        -- "Shape" field; no string->class translation needed at spawn time.
+        local FuelShape = FuelConfig:AddComboBox()
+        FuelShape:AddChoice("Box", "ACF.ContainerShapes.Box")
+        FuelShape:AddChoice("Sphere", "ACF.ContainerShapes.Sphere")
+        FuelShape:AddChoice("Cylinder", "ACF.ContainerShapes.Cylinder")
+
+        -- Set default shape
+        local DefaultShape = ACF.GetClientData("Shape")
+        if not GetType(DefaultShape) then DefaultShape = "ACF.ContainerShapes.Box" end
+        ACF.SetClientData("Shape", DefaultShape, true)
+        FuelShape:ChooseOptionID(DefaultShape == "ACF.ContainerShapes.Sphere" and 2 or DefaultShape == "ACF.ContainerShapes.Cylinder" and 3 or 1)
+        timer.Simple(0, function() if IsValid(FuelShape) then FuelShape:OnSelect(nil, nil, DefaultShape) end end) -- Frown
+
+        local Min = ACF.ContainerMinSize
+        local Max = ACF.ContainerMaxSize
+        local FuelPreview
+
+        -- Set default fuel tank size values before creating sliders to prevent nil value errors
+        local DefaultFuelSizeX = ACF.GetClientNumber("FuelSizeX", (Min + Max) / 2)
+        local DefaultFuelSizeY = ACF.GetClientNumber("FuelSizeY", (Min + Max) / 2)
+        local DefaultFuelSizeZ = ACF.GetClientNumber("FuelSizeZ", (Min + Max) / 2)
+        ACF.SetClientData("FuelSizeX", DefaultFuelSizeX, true)
+        ACF.SetClientData("FuelSizeY", DefaultFuelSizeY, true)
+        ACF.SetClientData("FuelSizeZ", DefaultFuelSizeZ, true)
+
+        local function UpdateSize()
+            -- MARCH: STEVE REMOVE THIS ONCE YOU FIX IT (Or leave it if you are fine with this)
+            ACF.SetClientData("Size", TankSize, true)
+        end
+
+        local SizeX = FuelConfig:AddSlider("#acf.menu.fuel.tank_length", Min, Max)
+        SizeX:SetClientData("FuelSizeX", "OnValueChanged")
+        SizeX:DefineSetter(function(Panel, _, _, Value)
+            local X = math.Round(Value)
+
+            Panel:SetValue(X)
+
+            TankSize.x = X
+
+            FuelType:UpdateFuelText()
+
+            if FuelPreview then
+                FuelPreview:SetModelScale(TankSize * 12)
+            end
+
+            UpdateSize()
+            return X
+        end)
+
+        local SizeY = FuelConfig:AddSlider("#acf.menu.fuel.tank_width", Min, Max)
+        SizeY:SetClientData("FuelSizeY", "OnValueChanged")
+        SizeY:DefineSetter(function(Panel, _, _, Value)
+            local Y = math.Round(Value)
+
+            Panel:SetValue(Y)
+
+            TankSize.y = Y
+
+            FuelType:UpdateFuelText()
+
+            if FuelPreview then
+                FuelPreview:SetModelScale(TankSize * 12)
+            end
+
+            UpdateSize()
+            return Y
+        end)
+
+        local SizeZ = FuelConfig:AddSlider("#acf.menu.fuel.tank_height", Min, Max)
+        SizeZ:SetClientData("FuelSizeZ", "OnValueChanged")
+        SizeZ:DefineSetter(function(Panel, _, _, Value)
+            local Z = math.Round(Value)
+
+            Panel:SetValue(Z)
+
+            TankSize.z = Z
+
+            FuelType:UpdateFuelText()
+
+            if FuelPreview then
+                FuelPreview:SetModelScale(TankSize * 12)
+            end
+
+            UpdateSize()
+            return Z
+        end)
+
+        local FuelBase = FuelConfig:AddCollapsible("#acf.menu.fuel.tank_info", nil, "icon16/cup_edit.png")
+        local FuelDesc = FuelBase:AddLabel()
+        FuelPreview = FuelBase:AddModelPreview(nil, true, "Secondary")
+        local FuelInfo = FuelBase:AddLabel()
+
+        function FuelShape:OnSelect(_, _, Data)
+            ACF.SetClientData("Shape", Data)
+
+            -- Update preview model based on shape
+            local ShapeClass = GetType(Data) or GetType("ACF.ContainerShapes.Box")
+            FuelPreview:UpdateModel(ShapeClass.Model, "models/props_canal/metalcrate001d")
+
+            FuelType:UpdateFuelText()
+        end
+
+        -- We don't work with a preset list of engines, these are created on the run instead.
+        function EngineClass:OnSelect(Index, _, Data)
+            if self.Selected == Data then return end
+
+            --self.ListData.Index = Index
+            self.Selected = Data
+
+            local ClassData = self.Selected
+            local ClassDesc = GetType(ClassData)
+            local ClassOpts = Classes.GetTypeFields(ClassDesc)[1].Options
+            local FieldInfo = {}
+
+            for K, V in pairs(ClassOpts) do
+                FieldInfo[K] = GetType(V)
+            end
+            PrintTable({ClassData, Classes.GetTypeFields(ClassDesc), ClassDesc, ClassOpts, FieldInfo})
+
+            ACF.SetClientData("EngineClass", ClassData)
+            ACF.LoadSortedList(FuelType, FieldInfo, "Density")
+        end
+
+        function FuelType:OnSelect(Index, _, Data)
+            if self.Selected == Data then return end
+
+            self.ListData.Index = Index
+            self.Selected = Data
+
+            ACF.SetClientData("FuelType", Classes.GetTypeName(Data))
+
+            self:UpdateFuelText()
+        end
+
+        function FuelType:UpdateFuelText()
+            if not self.Selected then return end
+
+            local TextFunc = self.Selected.FuelTankText
+            local FuelText = ""
+
+            local Wall = ACF.ContainerArmor * ACF.MmToInch -- Wall thickness in inches
+            local Shape = GetType(ACF.GetClientData("Shape")) or GetType("ACF.ContainerShapes.Box")
+
+            -- Calculate volume and area using shape calculations
+            local Volume, Area = Shape.ShapeCalculation(TankSize, Wall)
+
+            local Capacity	= Volume * ACF.gCmToKgIn -- Internal volume available for fuel in liters
+            local EmptyMass	= Area * Wall * ACF.InchToCmCu * ACF.SteelDensity -- Total wall volume * cu in to cc * density of steel (kg/cc)
+            local Mass		= EmptyMass + Capacity * self.Selected.Density -- Weight of tank + weight of fuel
+
+            if TextFunc then
+                FuelText = FuelText .. TextFunc(Capacity, Mass, EmptyMass)
+            else
+                local Text = language.GetPhrase("acf.menu.fuel.tank_stats")
+                local Liters = math.Round(Capacity, 2)
+                local Gallons = math.Round(Capacity * ACF.LToGal, 2)
+
+                FuelText = FuelText .. Text:format(ACF.ContainerArmor, Liters, Gallons, ACF.GetProperMass(Mass), ACF.GetProperMass(EmptyMass))
+            end
+
+            FuelDesc:SetText("Scalable Fuel Tank\n\nShape: " .. (Shape.Name or "Box"))
+            FuelInfo:SetText(FuelText)
         end
     end
 end)

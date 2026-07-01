@@ -9,6 +9,7 @@ function ENT:ACF_UpdateOverlayState(State)
     else
         State:AddWarning(self.State)
     end
+    State:AddKeyValue("Type", ACF.Classes.GetTypeByName(self.EngineClass).Name)
     -- Unit conversion on bore and stroke, from Centimeters to Millimeters
     State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))
     State:AddKeyValue("Stroke", ("%s mm"):format(self.Stroke * 10))

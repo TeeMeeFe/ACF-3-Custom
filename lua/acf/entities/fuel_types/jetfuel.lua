@@ -1,6 +1,7 @@
-ACF.Classes.DefineClass("ACF.FuelTypes.JetFuel", "ACF.FuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.JetFuel", "ACF.CustomFuelTypes.FuelType", function()
     CLASS.Name         = "Jet Fuel"
     CLASS.ShortName    = "JetFuel"
+    CLASS.ID           = "Jet"
     CLASS.Density      = 0.832  -- kg/L
     CLASS.IgnitionType = "both" -- Technically can use both sparkplugs and glowplugs, as well as being multifuel
     CLASS.Efficiency   = 0.45   -- kg/kWh BSFC at ground level
