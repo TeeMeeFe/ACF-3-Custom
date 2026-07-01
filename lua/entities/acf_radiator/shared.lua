@@ -8,7 +8,7 @@ ENT.ACF_PreventArmoring = true
 
 ENT.IsACFRadiator = true
 
-ACF.AutoRegisterV2(function()
+ACF.Entities.AutoRegisterV2(function()
     FIELD("ACF.Radiators.RadiatorType", "RadiatorType", {
         InstantiateTypeForDefault = "ACF.Radiators.Standard",
         OnlyAllowSubtypes = true

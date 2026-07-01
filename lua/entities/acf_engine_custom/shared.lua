@@ -8,13 +8,14 @@ ENT.ACF_PreventArmoring = true
 
 ENT.IsACFCustomEngine = true
 
-ACF.AutoRegisterV2(function()
+ACF.Entities.AutoRegisterV2(function()
     MENU_FIELD("ACF.Engines.BlockType", "BlockType", {InstantiateTypeForDefault = "ACF.Engines.PistonBlock", OnlyAllowSubtypes = true})
-    MENU_FIELD("ACF.FuelTypes.FuelType", "FuelType", {InstantiateTypeForDefault = "ACF.FuelTypes.CustomPetrol", OnlyAllowSubtypes = true})
-    FIELD("ACF.Engines.PistonBlock", "EngineType", {InstantiateTypeForDefault = "ACF.Engines.InlineEngine", OnlyAllowSubtypes = true})
     --FIELD("ACF.Engines.Model", "EngineBlockModel", {Model = "models/holograms/cube.mdl"})
     --LINKED_ENTITY_FIELD("engine_custom", {AcceptableClasses = {acf_battery = false, acf_radiator = false}})
     --LINKED_ARRAY_FIELD("fueltanks", {AcceptableClasses = {acf_fueltank = true}})
+
+    -- Nothing to validate: the Engine field is constrained to ACF.Engines.* subtypes by the serializer.
+    function CLASS:VerifyData() end
 end, "Custom Engine", "Custom Engines")
 
 ENT.ACF_StaticWireInputs = {
@@ -32,3 +33,8 @@ ENT.ACF_StaticWireOutputs = {
     "Physical Mass (Physical mass detected on the vehicle by the engine.)",
     "Entity (The engine itself.) [ENTITY]",
 }
+
+-- Returns the engine instance backing this entity.
+function ENT:GetEngine()
+    return self:ACF_GetUserVar("Engine")
+end

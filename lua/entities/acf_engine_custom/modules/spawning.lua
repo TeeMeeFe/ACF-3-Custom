@@ -68,7 +68,7 @@ function ENT:ACF_OnSpawn(Owner, _, _, ClientData)
 end
 
 function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
-	--Contraption.SetMass(self, self.Mass) -- We later get the mass of the contraption
+	--Contraption.SetMass(self, self.ACF.Mass) -- We later get the mass of the contraption
 	--duplicator.StoreEntityModifier(self, "mass", { Mass = 100 })
 
 	local Params = {
@@ -105,6 +105,7 @@ function ENT:ACF_PostSpawn(Owner, _, _, ClientData)
 	self.FlywheelInertia 	= Compute.FlywheelInertia
 	self.FlyRPM				= 0
 	self.HeatCoefficient	= Compute.HeatCoeff
+	self.HealthMult			= 0.3 -- Insane coping because march did something with the class registration 
 	self.IdleRPM			= Compute.IdleRPM
 	self.IsStalled			= false
 	self.Layout				= Compute.Layout
@@ -261,6 +262,33 @@ function ENT:OnRemove(IsFullUpdate)
 
 	TimerRemove("ACF Engine Clock " .. self:EntIndex())
 end
+
+-- Cope for now
+function ENT:ACF_Activate()
+end
+--[[]
+function ENT:ACF_Activate(Recalc)
+	local PhysObj = self.ACF.PhysObj
+	local Mass    = PhysObj:GetMass()
+	local Area    = PhysObj:GetSurfaceArea() * ACF.InchToCmSq
+	-- Fucking ArmoUr :face_vomiting: :face_vomiting: :face_vomiting: :face_vomiting: :face_vomiting:
+	-- Britons gave us americans the english language so we can sanitize it and have it sound more or less understandable and be more legible!
+	-- TODO: Replace this variable name and all instances of it with the correct word and fix the comment since its wrong lol
+	local Armour  = Mass * 1000 / Area / 0.78 * ACF.ArmorMod -- Density of steel = 7.8g cm3 so 7.8kg for a 1mx1m plate 1m thick
+	local Health  = Area / ACF.Threshold
+	local Percent = 1
+
+	if Recalc and self.ACF.Health and self.ACF.MaxHealth then
+		Percent = self.ACF.Health / self.ACF.MaxHealth
+	end
+
+	self.ACF.Area      = Area
+	self.ACF.Health    = Health * Percent * self.HealthMult
+	self.ACF.MaxHealth = Health * self.HealthMult
+	self.ACF.Armour    = Armour * (0.5 + Percent * 0.5)
+	self.ACF.MaxArmour = Armour
+	self.ACF.Type      = "Prop"
+end]]--
 
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:
