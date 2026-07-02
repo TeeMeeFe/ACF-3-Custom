@@ -1,9 +1,8 @@
-local ACF     = ACF
-local Classes = ACF.Classes
-local Round   = math.Round
-
-local TimerRemove  = timer.Remove
-
+local ACF     		= ACF
+local Classes 		= ACF.Classes
+local Round   		= math.Round
+local TimerRemove   = timer.Remove
+local Contraption   = ACF.Contraption
 local IsEntityValid = ACF.Optimizations.IsEntityValid
 
 -- Engines should have these states: IDLE, STARTING, ACTIVE, STALLING
@@ -11,7 +10,9 @@ local IsEntityValid = ACF.Optimizations.IsEntityValid
 
 local function UpdateEngine(Entity, Class)
 	Entity.ACF = Entity.ACF or {}
-	Entity:SetScaledModel(Class.Model)
+
+	local Model = Class.Model
+	Entity:SetScaledModel(Model)
 
 	local Params = {
 		Pistons   = Entity.Pistons,
@@ -31,6 +32,7 @@ local function UpdateEngine(Entity, Class)
 	local Name = ("%sL %s - %scc"):format(Round(Displacement.InLiters, 1), Sign, Round(Displacement.InCubicCentimeters))
 
 	-- Class compute table assignments
+	Entity.ACF.Model 		    = Model
 	Entity.Name      			= Name
 	Entity.ShortName 			= Name
 	Entity.BalanceFactor  		= Compute.BalanceFactor
@@ -52,6 +54,7 @@ local function UpdateEngine(Entity, Class)
 	Entity.IdleRPM				= Compute.IdleRPM
 	Entity.IsStalled			= false
 	Entity.Layout				= Compute.Layout
+	Entity.Mass                 = Compute.ScaledMass
 	Entity.RedlineRPM   		= Compute.RedlineRPM
 	Entity.OilSumpTilt  		= Compute.OilSumpTilt
 	Entity.PeakTorque			= Compute.PeakTorque
@@ -64,6 +67,7 @@ local function UpdateEngine(Entity, Class)
 	Entity.SoundVolume        	= Entity.SoundVolume or 1
 	Entity.Sign 				= Sign
 	Entity.Sample				= Compute.Sample
+	Entity.Scale                = Compute.ModelScale
 	Entity.SparksPerRev			= Compute.SparksPerRev
 	Entity.Stroke				= Compute.StrokeCm
 	Entity.SweptVolPerCyl		= Compute.SweptVolPerCyl
@@ -73,6 +77,10 @@ local function UpdateEngine(Entity, Class)
 	Entity.VECurve		    	= Compute.VECurve
 	Entity.HitBoxes         	= ACF.GetHitboxes(Entity:GetModel())
 	Entity.Out              	= ACF.LocalPlane(Entity:WorldToLocal(Entity:GetAttachment(Entity:LookupAttachment("driveshaft")).Pos), Vector(1, 0, 0))
+
+	Entity:SetScale(Entity.Scale)
+
+	Contraption.SetMass(Entity, Entity.Mass)
 
 	--PrintTable(Compute)
 	WireLib.TriggerOutput(Entity, "State", "Idle")
@@ -85,7 +93,6 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	--PrintTable({Classes.GetTypeByName(ClientData.EngineClass)})
 
 	self.ACF 				= {}
-	self.ACF.Model 		    = Model
 	self.Active        		= false
 	self.Engine             = Engine
 	self.EngineType 		= Classes.GetTypeName(Engine)
@@ -233,7 +240,9 @@ function ENT:OnRemove(IsFullUpdate)
 	TimerRemove("ACF Engine Clock " .. self:EntIndex())
 end
 
--- Cope for now, this doesn't work apparently for scalables 
+-- Cope for now, this apparently doesn't work for scalables
+function ENT:ACF_Activate() end
+--[[
 function ENT:ACF_Activate(Recalc)
 	local PhysObj = self.ACF.PhysObj
 	local Mass    = PhysObj:GetMass()
@@ -255,7 +264,7 @@ function ENT:ACF_Activate(Recalc)
 	self.ACF.Armour    = Armour * (0.5 + Percent * 0.5)
 	self.ACF.MaxArmour = Armour
 	self.ACF.Type      = "Prop"
-end
+end]]
 
 --[[ ACF Legality Check
 	ALL SENTS MUST HAVE:

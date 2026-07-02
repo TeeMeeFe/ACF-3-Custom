@@ -5,20 +5,20 @@ local TankSize    = Vector()
 local GetType = Classes.GetTypeByName
 
 ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", function()
-    CLASS.Name         = "Inline Engine"
-    CLASS.Description  = "A piston engine in a inlined configuration"
-    CLASS.Model        = "models/engines/inline4s.mdl"
-    CLASS.Layout       = "Inline"
-    CLASS.IsScalable   = true
-    CLASS.Mass         = 100 -- Relative to the Base model size
-    CLASS.Sign         = "I"
+    CLASS.Name                 = "Inline Engine"
+    CLASS.Description          = "A piston engine in a inlined configuration"
+    CLASS.Model                = "models/engines/inline4s.mdl"
+    CLASS.Layout               = "Inline"
+    CLASS.IsScalable           = true
+    CLASS.CubicReductionFactor = 0.85 -- Inverse ratio of empty mass volume an engine has, so it doesn't scale like if it was a solid piece.
+    CLASS.Sign                 = "I"
     -- These attributes would be private if we had actual scaffolding for that
     local __INLINE_BAL = { [2] = 0.72, [3] = 0.78, [4] = 0.84, [5] = 0.88, [6] = 0.96, [7] = 0.98, [8] = 1.00 }
     local __INLINE_IDL = { [2] = 1.08, [3] = 1.05, [4] = 1.00, [5] = 0.97, [6] = 0.92, [7] = 0.90, [8] = 0.88 }
 
-    FIELD("Number", "CustomEnginePistons",   {Min = 2,    Max = 8,  Default = 4,   Decimals = 0})
-    FIELD("Number", "CustomEngineBore",      {Min = 0.1,  Max = 10, Default = 4.0, Decimals = 2}) -- in Centimeters
-    FIELD("Number", "CustomEngineStroke",    {Min = 0.1,  Max = 10, Default = 4.2, Decimals = 2}) -- in Centimeters
+    FIELD("Number", "CustomEnginePistons",   {Min = 2,    Max = 6,  Default = 4,   Decimals = 0})
+    FIELD("Number", "CustomEngineBore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
+    FIELD("Number", "CustomEngineStroke",    {Min = 1,    Max = 20, Default = 4.2, Decimals = 2}) -- in Centimeters
     FIELD("Number", "CustomEngineClearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
 
     function CLASS.GetLayoutFactors(Pistons)
@@ -39,12 +39,14 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
     end
 
     function CLASS.Compute(_, Layout, Params)
-        Params.Layout = CLASS.Layout -- Append the layout field
+        local BASE = BASE
+
+        -- Append the layout and sign fields
+        Params.Layout = CLASS.Layout
         Params.Sign   = CLASS.Sign
 
         -- The base class has the implementation of this method, so we redict this info there instead
-        local BaseClass = Classes.GetBaseClass(CLASS)
-        local Computed = BaseClass.Compute(CLASS, Layout, Params)
+        local Computed = BASE.Compute(CLASS, Layout, Params)
 
         return Computed
     end

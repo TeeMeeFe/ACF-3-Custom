@@ -9,14 +9,14 @@ function ENT:Update()
 end
 
 do	-- NET SURFER 2.0
-	net.Receive("ACF_InvalidateEngineInfo", function()
+	net.Receive("ACF_InvalidateCustomEngineInfo", function()
 		local Engine = net.ReadEntity()
 		if not IsValid(Engine) then return end
 
 		Engine.HasData	= false
 	end)
 
-	net.Receive("ACF_RequestEngineInfo", function()
+	net.Receive("ACF_RequestCustomEngineInfo", function()
 		local Engine		= net.ReadEntity()
 		local Driveshaft	= net.ReadVector()
 		local Outputs		= {}
@@ -92,7 +92,7 @@ do	-- NET SURFER 2.0
 
 		timer.Simple(5, function() Queued[self] = nil end)
 
-		net.Start("ACF_RequestEngineInfo")
+		net.Start("ACF_RequestCustomEngineInfo")
 			net.WriteEntity(self)
 		net.SendToServer()
 	end

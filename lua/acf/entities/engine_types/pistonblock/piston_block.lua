@@ -7,6 +7,7 @@ local floor   = math.floor
 local exp     = math.exp
 local min     = math.min
 local max     = math.max
+local pow     = math.pow
 local sqrt    = math.sqrt
 
 -- ===========================================================================
@@ -70,8 +71,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
     CLASS.LHV_KWH       = 12.222222 -- 44000 / 3600 petrol lower heating value (kWh/kg).
     CLASS.ETA_FRIC      = 0.55      -- Otto → shaft efficiency fraction
     CLASS.BMEP_Scale    = 40        -- bar per unit of TorqueScale
-    -- Inline calibrated piston mass: 0.5 g per cm² of bore area
-    CLASS.PistonMass_K  = 0.0005    -- kg per cm² of bore cross-section
+    -- Inline engine calibrated mass coefficients
+    CLASS.PistonMass_K  = 0.0005    -- kg per cm²
+    CLASS.RodMass_K     = 0.0009    -- kg per cm²
+    CLASS.CrankMass_K   = 0.0028    -- kg per cm³
+    CLASS.BlockMass_K   = 0.05      -- kg per cm³
+    CLASS.HeadMass_K    = 0.018     -- kg per cm³
     -- Base heat coefficient calibrated for 1.0 L, CR 9 petrol engine
     CLASS.HeatBase      = 0.012
     -- Reference BSFC for type-correction ratio
@@ -365,15 +370,28 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- ── 1. Compression ratio (dimensionless — cm cancel) ──
         local CR = 1 + Stroke_cm / Clearance_cm
 
-        -- ── 2. Swept volume and displacement ──────────────────
+        -- ── 2. Swept volume and displacement 
         -- V_swept (cm³) = π/4 × bore² × stroke
         -- V_total (cm³) = V_swept × Pistons  -- In cubic centimeters
         -- V_total (L)   = V_total × 0.001    -- In liters
-        local V_swept_cm3 = (PI / 4) * Bore_cm * Bore_cm * Stroke_cm
+        local V_swept_cm3 = (PI * 0.25) * Bore_cm * Bore_cm * Stroke_cm
         local V_total_cm3 = V_swept_cm3 * Pistons
         local V_total_L   = V_total_cm3 * 0.001
 
-        -- ── 3. Peak torque via BMEP ───────────────────────────
+        -- ── 3. Compute base engine mass based on its block and recipient masses ───
+        local Area = V_swept_cm3 / Stroke_cm
+
+        local PistonsMass = Area * Pistons * CLASS.PistonMass_K
+        local RodsMass    = V_total_cm3 * CLASS.RodMass_K
+        local CrankMass   = V_total_cm3 * CLASS.CrankMass_K
+        local BlockMass   = V_total_cm3 * CLASS.BlockMass_K * SuperClass.CubicReductionFactor
+        local HeadMass    = V_total_cm3 * CLASS.HeadMass_K * SuperClass.CubicReductionFactor
+
+        local ModelMass = PistonsMass + RodsMass + CrankMass + BlockMass + HeadMass
+
+        -- local ModelMass = BaseMass * (V_total_L ^ (3 * SuperClass.CubicReductionFactor))
+
+        -- ── 4. Peak torque via BMEP ───────────────────────────
         -- T = BMEP_Pa × V_total_m³ / (4π)    [4-stroke cycle]
         local BMEP_Pa    = TypeDef.TorqueScale * CLASS.BMEP_Scale * 1e5
         -- Wankel rotary: each rotor provides WANKEL_POWER_STROKES combustion
@@ -384,12 +402,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- Apply volumetric efficiency layout bonus/penalty
         local peakTorque = (BMEP_Pa * (V_total_L * 1e-3) / (4 * PI)) * (1 + (LayoutFactors.VEBonus or 0))
 
-        -- ── 4. Redline from mean piston speed ─────────────────
+        -- ── 5. Redline from mean piston speed ─────────────────
         -- RPM_max = 60 × v_piston / (2 × stroke_m)
         -- stroke_m = Stroke_cm × 0.01  →  inline
         local redlineRPM = floor(60 * PistonSpeed / (2 * Stroke_cm * 0.01))
 
-        -- ── 5. Idle RPM from bore/stroke ratio + layout ───────
+        -- ── 6. Idle RPM from bore/stroke ratio + layout ───────
         -- base_idle = 800 × √(bore/stroke)  [dimensionless ratio]
         -- BalanceFactor: smoother engines can idle lower; rougher need more RPM
         -- IdleRPMMult: layout-specific adjustment (Wankel idles higher; boxer lower)
@@ -397,7 +415,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local bal_idle  = base_idle / max(LayoutFactors.BalanceFactor, 0.5)
         local idleRPM   = clamp(floor(bal_idle * (LayoutFactors.IdleRPMMult or 1.0)), 300, 2200)
 
-        -- ── 6. BSFC from Otto efficiency + CR + type ──────────
+        -- ── 7. BSFC from Otto efficiency + CR + type ──────────
         -- η_otto = 1 − (1/CR)^(γ-1)
         -- η_real = CLASS.ETA_FRIC × η_otto
         -- BSFC   = 1 / (η_real × CLASS.LHV_KWH)          [kg/kWh, theoretical]
@@ -408,12 +426,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local typeCorr  = (TypeDef.Efficiency or CLASS.REF_BSFC) / CLASS.REF_BSFC
         local BSFC_eff  = BSFC_base * typeCorr * (LayoutFactors.BSFCMult or 1.0)
 
-        -- ── 7. Heat generation coefficient ────────────────────
+        -- ── 8. Heat generation coefficient ────────────────────
         -- Proportional to displacement; inversely proportional to CR.
         -- Higher CR → better thermal efficiency → less waste heat.
         local heatCoeff = CLASS.PistonMass_K * V_total_L * (9.0 / CR)
 
-        -- ── 8. Flywheel inertia ───────────────────────────────
+        -- ── 9. Flywheel inertia ───────────────────────────────
         -- I = Pistons × m_piston × stroke_m² × k_crank
         -- m_piston (kg) = PistonMass_K × bore_cm²
         -- Combined (inline): Pistons × PistonMass_K × bore² × stroke² × 1e-3
@@ -421,7 +439,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local I_base = Pistons * CLASS.PistonMass_K * Bore_cm * Bore_cm * Stroke_cm * Stroke_cm * 0.1 -- 0.1 as 0.001 was having no inertia at all
         local inertia = I_base * (LayoutFactors.InertiaFactor or 1.0)
 
-        -- ── 9. Torque curve — derived from physical parameters ───
+        -- ── 10. Torque curve — derived from physical parameters ───
         -- HeadType/CamProfile/etc. are read from params (item-level override)
         -- then fall back to typeDef (engine-type default).
         -- TorqueCurve is no longer hand-authored; the shape is fully computed.
@@ -436,10 +454,13 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             redlineRPM,
             isWankel)
 
-        -- ── 10. Torque curve ───────────────────────────────────
+        -- ── 11. Torque curve ──────────────────────────────────────────
         local ct = BuildCurve(VECurve, peakTorque, redlineRPM)
 
-        -- ── 11. Assemble geometric table ────────────────────────────
+        -- ── 12. Compute model's size according to its displacement ────
+        local Scale = 1.08 * pow(V_total_L, 0.30)
+
+        -- ── 13. Assemble geometric table ──────────────────────────────
         local geometric = {
             -- Identity
             Layout             = Params.Layout,
@@ -452,6 +473,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             StrokeCm           = Stroke_cm,
             ClearanceCm        = Clearance_cm,
             Pistons            = Pistons,
+            ModelScale         = Scale,
+            ScaledMass         = ModelMass,
             Sign               = Params.Sign .. Pistons, -- Sign of the engine, e.g: "I4", "V8", "Radial 7"
             -- Derived geometry
             CompressionRatio   = CR,

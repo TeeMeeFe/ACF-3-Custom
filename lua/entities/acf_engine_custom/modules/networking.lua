@@ -2,16 +2,16 @@ local ACF = ACF
 local IsEntityValid = ACF.Optimizations.IsEntityValid
 
 -- NET SURFER 2.0
-util.AddNetworkString("ACF_RequestEngineInfo")
-util.AddNetworkString("ACF_InvalidateEngineInfo")
+util.AddNetworkString("ACF_RequestCustomEngineInfo")
+util.AddNetworkString("ACF_InvalidateCustomEngineInfo")
 
 function ENT:InvalidateClientInfo()
-    net.Start("ACF_InvalidateEngineInfo")
+    net.Start("ACF_InvalidateCustomEngineInfo")
         net.WriteEntity(self)
     net.Broadcast()
 end
 
-net.Receive("ACF_RequestEngineInfo", function(_, Ply)
+net.Receive("ACF_RequestCustomEngineInfo", function(_, Ply)
     local Entity = net.ReadEntity()
 
     if IsEntityValid(Entity) then
@@ -38,7 +38,7 @@ net.Receive("ACF_RequestEngineInfo", function(_, Ply)
             end
         end
 
-        net.Start("ACF_RequestEngineInfo")
+        net.Start("ACF_RequestCustomEngineInfo")
             net.WriteEntity(Entity)
             net.WriteVector(Driveshaft)
             net.WriteUInt(#Outputs, 6)
