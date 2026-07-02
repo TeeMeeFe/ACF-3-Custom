@@ -1,4 +1,5 @@
 local ACF      		 = ACF
+local Classes        = ACF.Classes
 local IsEntityValid  = ACF.Optimizations.IsEntityValid
 local Mobility       = ACF.Mobility
 local MobilityObj    = Mobility.Objects
@@ -6,7 +7,7 @@ local MaxDistance    = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
 local MaxRadDistance = ACF.RadiatorLinkDistance * ACF.RadiatorLinkDistance
 
 ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank", function(Engine, Target)
-    local TargetFuelType = ACF.Classes.GetTypeName(Target:ACF_GetUserVar("FuelType"):GetType())
+    local TargetFuelType = Classes.GetTypeName(Target:ACF_GetUserVar("FuelType"):GetType())
 
     PrintTable({TargetFuelType})
     if Engine.FuelTanks[Target] then return false, "This engine is already linked to this fuel tank!" end

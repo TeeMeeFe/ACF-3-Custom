@@ -5,7 +5,7 @@ local function CreateMenu(Menu)
     ACF.SetClientData("PrimaryClass", "N/A")
     ACF.SetClientData("SecondaryClass", "N/A")
 
-    ACF.SetToolMode("acf_menu", "Spawner", "acf_engine_custom")
+    ACF.SetToolMode("acf_menu", "Spawner", "Custom Engine")
 
     Menu:AddTitle("Custom Engine Settings")
     Menu:AddHelp("Create a custom engine from scratch.")

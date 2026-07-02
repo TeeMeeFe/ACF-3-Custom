@@ -529,5 +529,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         ACF.SetClientData("PrimaryClass", "acf_engine_custom")
         ACF.SetClientData("SecondaryClass", "acf_fueltank")
         ACF.SetClientData("FuelTank", "Scalable") -- Set default fuel tank to scalable
+
+        ACF.SetToolMode("acf_menu", "Spawner", "Engine") -- Just in case
     end
 end)    
