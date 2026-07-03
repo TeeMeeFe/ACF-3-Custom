@@ -152,11 +152,10 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
         -- Fuel config labels and stuff 
         local FuelConfig = SubMenu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")
         local EngineClass = FuelConfig:AddComboBox()
-        -- For some reason its failing to list either petrol or diesel fuel types.
-        EngineClass:AddChoice("Diesel Engine", "ACF.CustomEngineTypes.GenericDiesel")
-        EngineClass:AddChoice("Petrol Engine", "ACF.CustomEngineTypes.GenericPetrol")
+        EngineClass:AddChoice("Diesel Engine", "ACF.EngineTypes.GenericDiesel")
+        EngineClass:AddChoice("Petrol Engine", "ACF.EngineTypes.GenericPetrol")
         EngineClass:SetValue("Petrol Engine") -- Filthy fucking hack, i hate this
-        timer.Simple(0, function() if IsValid(EngineClass) then EngineClass:OnSelect(nil, nil, "ACF.CustomEngineTypes.GenericPetrol") end end) -- smh
+        timer.Simple(0, function() if IsValid(EngineClass) then EngineClass:OnSelect(nil, nil, "ACF.EngineTypes.GenericPetrol") end end) -- smh
 
         local FuelType = FuelConfig:AddComboBox()
         --=========================================================================--
@@ -267,24 +266,26 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
         end
 
         -- We don't work with a preset list of engines, these are created on the run instead.
-        function EngineClass:OnSelect(Index, _, Data)
+        function EngineClass:OnSelect(_, _, Data)
             if self.Selected == Data then return end
 
             --self.ListData.Index = Index
             self.Selected = Data
 
-            local ClassData = self.Selected
-            local ClassDesc = GetType(ClassData)
-            local ClassOpts = Classes.GetTypeFields(ClassDesc)[1].Options
-            local FieldInfo = {}
+            local FuelData
 
-            for K, V in pairs(ClassOpts) do
-                FieldInfo[K] = GetType(V)
+            -- Shitty hack to get the type of fuel used for these engine Classes
+            if Data == "ACF.EngineTypes.GenericPetrol" then
+                FuelData = "ACF.FuelTypes.Petrol"
+            elseif Data == "ACF.EngineTypes.GenericDiesel" then
+                FuelData = "ACF.FuelTypes.Diesel"
             end
-            PrintTable({ClassData, Classes.GetTypeFields(ClassDesc), ClassDesc, ClassOpts, FieldInfo})
 
-            ACF.SetClientData("EngineClass", ClassData)
-            ACF.LoadSortedList(FuelType, FieldInfo, "Density")
+            local FuelDescription = GetType(FuelData)
+            local Fuel = {FuelData = FuelDescription}
+
+            ACF.SetClientData("EngineClass", Data)
+            ACF.LoadSortedList(FuelType, Fuel, "ID")
         end
 
         function FuelType:OnSelect(Index, _, Data)
@@ -293,6 +294,7 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
             self.ListData.Index = Index
             self.Selected = Data
 
+            --PrintTable({self.ListData.Index, self.Selected, Classes.GetTypeName(Data)})
             ACF.SetClientData("FuelType", Classes.GetTypeName(Data))
 
             self:UpdateFuelText()

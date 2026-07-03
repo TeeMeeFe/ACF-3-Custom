@@ -9,7 +9,6 @@ local MaxRadDistance = ACF.RadiatorLinkDistance * ACF.RadiatorLinkDistance
 ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank", function(Engine, Target)
     local TargetFuelType = Classes.GetTypeName(Target:ACF_GetUserVar("FuelType"):GetType())
 
-    PrintTable({TargetFuelType})
     if Engine.FuelTanks[Target] then return false, "This engine is already linked to this fuel tank!" end
     if Target.Engines[Engine] then return false, "This engine is already linked to this fuel tank!" end
     if not Engine.FuelTypes[TargetFuelType] then return false, "Cannot link because fuel type is incompatible." end

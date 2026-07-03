@@ -6,7 +6,7 @@ local function CreateMenu(Menu)
     ACF.SetClientData("PrimaryClass", "acf_radiator")
     ACF.SetClientData("SecondaryClass", "N/A")
 
-    ACF.SetToolMode("acf_menu", "Spawner", "acf_radiator")
+    ACF.SetToolMode("acf_menu", "Spawner", "Radiator")
 
     Menu:AddTitle("Radiator Settings")
     Menu:AddLabel("Allows you to efficiently cool down and stabilize an engine's temperature.")

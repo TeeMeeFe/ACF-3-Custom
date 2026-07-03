@@ -22,7 +22,16 @@ local function UpdateEngine(Entity, Class)
 	}
 
 	local TypeFields = Classes.GetTypeByName(Entity.EngineClass)
-	local FuelTypes = TypeFields.Fuel
+	local EngineClass = Entity.EngineClass
+	local FuelTypes = {}
+
+	-- Shitty hack to get the type of fuel used for these engine Classes
+	-- This is the same hack used for the menu creation in piston_block/inline.lua
+	if EngineClass == "ACF.EngineTypes.GenericPetrol" then
+		FuelTypes = {["ACF.FuelTypes.Petrol"] = true}
+	elseif EngineClass == "ACF.EngineTypes.GenericDiesel" then
+		FuelTypes = {["ACF.FuelTypes.Diesel"] = true}
+	end
 
 	local LayoutFactors = Class.GetLayoutFactors(Entity.Pistons)
 	local Compute = Class.Compute(Sel, LayoutFactors, Params)
@@ -47,7 +56,7 @@ local function UpdateEngine(Entity, Class)
 	Entity.FiringIrregularity 	= Compute.FiringIrregularity
 	Entity.FlywheelInertia 		= Compute.FlywheelInertia
 	Entity.FlyRPM				= 0
-	Entity.FuelTypes          	= FuelTypes or { ["ACF.CustomFuelTypes.Petrol"] = true }
+	Entity.FuelTypes          	= FuelTypes or { ["ACF.FuelTypes.Petrol"] = true }
 	Entity.FuelType           	= next(FuelTypes)
 	Entity.HeatCoefficient		= Compute.HeatCoeff
 	Entity.HealthMult			= TypeFields.HealthMult
@@ -82,7 +91,13 @@ local function UpdateEngine(Entity, Class)
 
 	Contraption.SetMass(Entity, Entity.Mass)
 
-	--PrintTable(Compute)
+	-- Calculate base fuel usage
+	--if Type.CalculateFuelUsage then
+	---	Entity.FuelUse = Type.CalculateFuelUsage(Entity)
+	--else
+		Entity.FuelUse = ACF.FuelRate * Entity.BSFC * 3e-8
+	--end
+
 	WireLib.TriggerOutput(Entity, "State", "Idle")
 
 end
@@ -90,7 +105,6 @@ end
 function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	local Engine = Classes.GetTypeByName(ClientData.EngineType)
-	--PrintTable({Classes.GetTypeByName(ClientData.EngineClass)})
 
 	self.ACF 				= {}
 	self.Active        		= false
@@ -173,8 +187,42 @@ ACF.RegisterLinkSource("acf_engine_custom", "Gearboxes")
 ACF.RegisterLinkSource("acf_engine_custom", "FuelTanks")
 ACF.RegisterLinkSource("acf_engine_custom", "Radiators")
 
-function ENT:PostEntityPaste(Player, Ent, CreatedEntities)
-	--[[local EntMods = Ent.EntityMods
+function ENT:PreEntityCopy()
+	if next(self.Gearboxes) then
+		local Gearboxes = {}
+
+		for Gearbox in pairs(self.Gearboxes) do
+			Gearboxes[#Gearboxes + 1] = Gearbox:EntIndex()
+		end
+
+		duplicator.StoreEntityModifier(self, "ACFGearboxes", Gearboxes)
+	end
+
+	if next(self.FuelTanks) then
+		local Tanks = {}
+
+		for Tank in pairs(self.FuelTanks) do
+			Tanks[#Tanks + 1] = Tank:EntIndex()
+		end
+
+		duplicator.StoreEntityModifier(self, "ACFFuelTanks", Tanks)
+	end
+
+	if next(self.Radiators) then
+		local Radiators = {}
+
+		for Rad in pairs(self.Radiators) do
+			Radiators[#Radiators + 1] = Rad:EntIndex()
+		end
+
+		duplicator.StoreEntityModifier(self, "ACFRadiators", Radiators)
+	end
+
+	-- AutoRegisterV2 wraps this as the original PreEntityCopy and handles the wire/base dupe info.
+end
+
+function ENT:PostEntityPaste(_, Ent, CreatedEntities)
+	local EntMods = Ent.EntityMods
 
 	-- Backwards compatibility
 	if EntMods.GearLink then
@@ -214,14 +262,26 @@ function ENT:PostEntityPaste(Player, Ent, CreatedEntities)
 		EntMods.ACFFuelTanks = nil
 	end
 
-	--Wire dupe info
-	self.BaseClass.PostEntityPaste(self, Player, Ent, CreatedEntities)]]--
+	-- AutoRegisterV2 wraps this as the original PostEntityPaste and handles the wire/base dupe info.
+end
+
+-- Cope for now, in the future we should consider adding the cost of any other attachments to this engine...
+function ENT:GetCost()
+	local selftbl = self:GetTable()
+
+	return math.max(5, (selftbl.PeakTorque / 160) + (selftbl.PeakPower / 80))
 end
 
 -- Remove-only teardown. Captured by AutoRegisterV2 as OrigOnRemove; the generated OnRemove still
 -- runs ACF_OnEntityLast + WireLib cleanup around this.
 function ENT:OnRemove(IsFullUpdate)
 	if IsFullUpdate then return end
+
+	local Class = self.ClassData
+
+	if Class and Class.OnLast then
+		Class.OnLast(self, Class)
+	end
 
 	self:DestroySound()
 
@@ -239,46 +299,3 @@ function ENT:OnRemove(IsFullUpdate)
 
 	TimerRemove("ACF Engine Clock " .. self:EntIndex())
 end
-
--- Cope for now, this apparently doesn't work for scalables
-function ENT:ACF_Activate() end
---[[
-function ENT:ACF_Activate(Recalc)
-	local PhysObj = self.ACF.PhysObj
-	local Mass    = PhysObj:GetMass()
-	local Area    = PhysObj:GetSurfaceArea() * ACF.InchToCmSq
-	-- Fucking ArmoUr :face_vomiting: :face_vomiting: :face_vomiting: :face_vomiting: :face_vomiting:
-	-- Britons gave us americans the english language so we can sanitize it and have it sound more or less understandable and be more legible!
-	-- TODO: Replace this variable name and all instances of it with the correct word and fix the comment since its wrong lol
-	local Armour  = Mass * 1000 / Area / 0.78 * ACF.ArmorMod -- Density of steel = 7.8g cm3 so 7.8kg for a 1mx1m plate 1m thick
-	local Health  = Area / ACF.Threshold
-	local Percent = 1
-
-	if Recalc and self.ACF.Health and self.ACF.MaxHealth then
-		Percent = self.ACF.Health / self.ACF.MaxHealth
-	end
-
-	self.ACF.Area      = Area
-	self.ACF.Health    = Health * Percent * self.HealthMult
-	self.ACF.MaxHealth = Health * self.HealthMult
-	self.ACF.Armour    = Armour * (0.5 + Percent * 0.5)
-	self.ACF.MaxArmour = Armour
-	self.ACF.Type      = "Prop"
-end]]
-
---[[ ACF Legality Check
-	ALL SENTS MUST HAVE:
-	ENT.ACF.PhysObj defined when spawned
-	ENT.ACF.LegalMass defined when spawned
-	ENT.ACF.Model defined when spawned
-
-	ACF.CheckLegal(entity) called when finished spawning
-
-	function ENT:Enable()
-		<code>
-	end
-
-	function ENT:Disable()
-		<code>
-	end
-]]--
