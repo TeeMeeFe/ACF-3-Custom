@@ -386,8 +386,8 @@ function ENT:UpdateOutputs(SelfTbl)
         SelfTbl.LastRPM = FlyRPM
         WireLib.TriggerOutput(self, "RPM", FlyRPM)
     end
-    if SelfTbl.State ~= State then
-        SelfTbl.State = State
+    if SelfTbl.LastState ~= State then
+        SelfTbl.LastState = State
         WireLib.TriggerOutput(self, "State", State)
     end
 end

@@ -1,10 +1,12 @@
-local Clamp  = math.Clamp
+local clamp  = math.Clamp
+local abs    = math.abs
 local Sounds = ACF.Utilities.Sounds
 
+local ENTITY = FindMetaTable("Entity")
 
 local function GetPitchVolume(Engine)
 	local RPM = Engine.FlyRPM
-	local Pitch = Clamp(20 + (RPM * Engine.SoundPitch) * 0.02, 1, 255)
+	local Pitch = clamp(20 + (RPM * Engine.SoundPitch) * 0.02, 1, 255)
 	-- Rev limiter code disabled because it has issues with the volume delta time, but it's still here if we need it
 	local Throttle = Engine.Throttle -- Engine.RevLimited and 0 or Engine.Throttle
 	local Volume = 0.25 + (0.1 + 0.9 * ((RPM / Engine.RedlineRPM) ^ 1.5)) * Throttle * 0.666
@@ -13,7 +15,7 @@ local function GetPitchVolume(Engine)
 end
 
 function ENT:UpdateSound(SelfTbl)
-	SelfTbl = SelfTbl or self:GetTable()
+	SelfTbl = SelfTbl or ENTITY.GetTable(self)
 
 	local Path      = SelfTbl.SoundPath
 	local LastSound = SelfTbl.LastSound
@@ -29,7 +31,7 @@ function ENT:UpdateSound(SelfTbl)
 
 	local Pitch, Volume = GetPitchVolume(SelfTbl)
 
-	if math.abs(Pitch - SelfTbl.LastPitch) < 1 then return end -- Don't bother updating if the pitch difference is too small to notice
+	if abs(Pitch - SelfTbl.LastPitch) < 1 then return end -- Don't bother updating if the pitch difference is too small to notice
 
 	SelfTbl.LastPitch = Pitch
 

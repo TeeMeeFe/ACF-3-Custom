@@ -28,7 +28,7 @@ ENT.ACF_StaticWireOutputs = {
     "Torque (Current torque, in nM, output by the engine.)",
     "Power (Current power, in kW, output by the engine.)",
     "Fuel Use (Amount of fuel, in liters per minute, being consumed by the engine.)",
-    "State (Current state of the engine, whether its off, starting, running or stalling)",
+    "State (Current state of the engine, whether its off, starting, running or stalling) [STRING]",
     "Mass (Total mass detected on the vehicle by the engine.)",
     "Physical Mass (Physical mass detected on the vehicle by the engine.)",
     "Entity (The engine itself.) [ENTITY]",

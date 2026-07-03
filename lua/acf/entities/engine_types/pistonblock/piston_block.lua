@@ -229,8 +229,31 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         }
 
         local VE_SAMPLES        = 24     -- resolution of the sampled output array
-        local VE_RISE_START     = 0.02   -- rpm fraction where VE begins to rise from idle
-        local V_SOUND           = ACF.SpeedOfSound    -- m/s  (15°C air, close enough for intake calc)
+        -- Minimum width (RPM fraction of redline) of the continued rise from idle
+        -- up to full plateau. Below idle the curve is held at 0 — the engine isn't
+        -- in its running torque regime below idle (that's the cranking/stalling
+        -- domain, handled separately by the starter/crank-torque model in
+        -- Crankshaft). AT idle itself the curve must already be comfortably
+        -- non-zero (see VE_IDLE_FRACTION below) or the engine has no torque to
+        -- overcome its own friction and stalls the instant it reaches idle.
+        local VE_RISE_SHARP_WIDTH = 0.05
+        -- Fraction of redline BELOW idle where the curve leaves zero and begins
+        -- climbing toward the idle value. A short pre-idle ramp rather than an
+        -- instant step avoids a discontinuous jump right as the engine crosses
+        -- into its running domain.
+        local VE_PRE_IDLE_WIDTH   = 0.06
+        -- VE value (fraction of peak) that the curve GUARANTEES at idleFrac itself.
+        -- This is what makes idle self-sustaining: a running engine at idle must
+        -- produce enough torque to overcome its own internal friction, so VE at
+        -- idle cannot be allowed to land near zero regardless of head/cam/runner
+        -- shape. 0.35 is a representative real-world idle VE fraction — well
+        -- below peak-torque VE, but decisively non-zero.
+        local VE_IDLE_FRACTION    = 0.35
+        -- Idle fraction is clamped below this so a pathologically high idle RPM
+        -- (e.g. a heavily IdleRPMMult'd layout) can't collapse the curve's usable
+        -- range to nothing.
+        local VE_MAX_IDLE_FRAC    = 0.35
+        local V_SOUND           = ACF.SpeedOfSound    -- m/s  (20°C air, close enough for intake calc)
         local RES_BONUS         = 0.06   -- max Gaussian VE bonus from intake resonance
         local RES_WIDTH         = 0.15   -- Gaussian σ in RPM-fraction units
         local SCAV_BONUS        = 0.04   -- max header-scavenging VE bonus
@@ -243,6 +266,28 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local DIESEL_SUPPRESS   = 0.35   -- Max fractional VE loss at the diesel RPM limit
         local RUNNER_REF_CM     = 22.0
         local RUNNER_SHIFT_K    = 0.0025   -- RPM-fraction shift per cm of runner length difference
+
+        --- Two-segment idle-anchored rise.  Guarantees ve(idleFrac) == VE_IDLE_FRACTION
+        --- exactly, regardless of how far away rise_end sits — a single smoothstep
+        --- from a below-idle zero point cannot make that guarantee (its value at
+        --- idle depends on where idle happens to fall within the window, which
+        --- varies unpredictably with head/cam/runner parameters and can land at
+        --- or near zero, leaving the engine unable to sustain its own idle).
+        ---
+        --- Segment A: zero_start → idleFrac,  rises 0 → VE_IDLE_FRACTION
+        --- Segment B: idleFrac   → rise_end,  rises VE_IDLE_FRACTION → 1.0
+        local function IdleAnchoredRise(t, idleFrac, rise_end)
+            local zero_start = max(0, idleFrac - VE_PRE_IDLE_WIDTH)
+
+            if t <= zero_start then
+                return 0
+            elseif t <= idleFrac then
+                return VE_IDLE_FRACTION * smoothstep(zero_start, idleFrac, t)
+            else
+                return VE_IDLE_FRACTION
+                    + (1 - VE_IDLE_FRACTION) * smoothstep(idleFrac, rise_end, t)
+            end
+        end
 
         --- Computes a normalised volumetric-efficiency curve (0–1 values, peak = 1)
         --- from physical valve-train, intake, exhaust, and fuel-delivery parameters.
@@ -260,17 +305,20 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         --- Returns a flat array of VE_SAMPLES normalised values evenly spaced 0→redline.
         local function BuildVECurve(headType, camProfile, runnerLen_cm,
                                     exhaustType, fuelDelivery, ignType,
-                                    redlineRPM, isWankel)
+                                    redlineRPM, isWankel, idleFrac)
+
+            idleFrac = clamp(idleFrac or 0, 0, VE_MAX_IDLE_FRAC)
 
             -- ── Wankel port-timing model (overrides valve-train entirely) ──
             if isWankel then
-                -- Wankel ports open/close by rotor position rather than a cam.
-                -- Characteristics: fast rise, broad plateau, moderate rolloff at high RPM.
-                -- Short intake runners (13B ≈ 14 cm) produce a mid-high resonance bonus.
+                -- Characteristics: fast rise right at idle, broad plateau, moderate
+                -- rolloff at high RPM. No per-cam adjustment — port timing is fixed
+                -- by the rotor geometry.
+                local rise_end = max(0.22, idleFrac + VE_RISE_SHARP_WIDTH)
                 local pts = {}
                 for i = 1, VE_SAMPLES do
                     local t  = (i - 1) / (VE_SAMPLES - 1)
-                    local ve = smoothstep(0.01, 0.22, t)
+                    local ve = IdleAnchoredRise(t, idleFrac, rise_end)
                             * (1 - smoothstep(0.73, 0.99, t))
                     -- Resonance bonus at ~65% redline (short runner)
                     local dr = (t - 0.65) / 0.16
@@ -292,16 +340,26 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             -- short runners bias toward high RPM.
             local runner_shift = (RUNNER_REF_CM - (runnerLen_cm or RUNNER_REF_CM)) * RUNNER_SHIFT_K
 
+            -- Rise completes at the head's natural plateau point, UNLESS idle sits
+            -- close enough to it that the guaranteed sharp post-idle window would
+            -- overrun it — in that case the sharp window wins so the rise never
+            -- inverts (this only matters for unusually high-idle layouts).
+            local rise_end = max(head.rise_end, idleFrac + VE_RISE_SHARP_WIDTH)
+
             local fall_start = head.fall_start + cam.shift + runner_shift
             local fall_width  = (head.fall_end - head.fall_start) / cam.fall_k
             local fall_end    = fall_start + fall_width
-            local rise_end    = head.rise_end   -- rise is not shifted by cam
-
+            -- Safety clamp: fall can never begin before the rise has finished,
+            -- which would otherwise invert the curve for extreme cam/runner combos.
+            if fall_start <= rise_end then
+                fall_start = rise_end + 0.05
+                fall_end   = fall_start + fall_width
+            end
             -- ── Intake resonance: Helmholtz RPM from runner length ─
             local resonance_frac = 0.55   -- fallback if no runner data
             if runnerLen_cm and runnerLen_cm > 0 then
                 local res_rpm    = (V_SOUND / (4 * runnerLen_cm * 0.01)) * 60
-                resonance_frac   = math.Clamp(res_rpm / redlineRPM, 0.1, 1.2)
+                resonance_frac   = clamp(res_rpm / redlineRPM, 0.1, 1.2)
             end
 
             -- ── Sample the curve ───────────────────────────────────
@@ -309,19 +367,20 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             for i = 1, VE_SAMPLES do
                 local t = (i - 1) / (VE_SAMPLES - 1)   -- 0 to 1
 
-                -- Base VE: smooth rise × smooth fall (trapezoidal with rounded edges)
-                local ve = smoothstep(VE_RISE_START, rise_end, t)
-                        * (1 - smoothstep(fall_start, fall_end, t))
+                -- VE = 0 well below idle; guaranteed VE_IDLE_FRACTION exactly at
+                -- idle; continues to rise_end; smooth fall after.
+                local ve = IdleAnchoredRise(t, idleFrac, rise_end)
+                    * (1 - smoothstep(fall_start, fall_end, t))
 
                 -- Intake resonance Gaussian bonus (scales with base VE so it
                 -- doesn't add a bump where the engine is otherwise dead)
                 local dr = (t - resonance_frac) / RES_WIDTH
-                ve = ve + ve * RES_BONUS * math.exp(-0.5 * dr * dr)
+                ve = ve + ve * RES_BONUS * exp(-0.5 * dr * dr)
 
                 -- Header scavenging (upper-mid band bonus)
                 if exhaustType == "header" then
                     local ds = (t - SCAV_PEAK) / SCAV_WIDTH
-                    ve = ve + ve * SCAV_BONUS * math.exp(-0.5 * ds * ds)
+                    ve = ve + ve * SCAV_BONUS * exp(-0.5 * ds * ds)
                 end
 
                 -- Carburetor high-RPM penalty (venturi saturation)
@@ -337,7 +396,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
                     ve = ve * (1 - suppress * DIESEL_SUPPRESS)
                 end
 
-                pts[i] = math.Clamp(ve, 0, 1)
+                pts[i] = clamp(ve, 0, 1)
             end
 
             -- Normalise so peak = 1.0 (peak torque is set by BMEP, not by this array)
@@ -353,7 +412,6 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local TypeDef = {
             PistonSpeed = 20,
             TorqueScale = 0.25,
-            --TorqueCurve = { 0, 0.1, 0.2, 0.4, 0.65, 0.85, 1, 0.9, 0.6 },
             Efficiency  = 0.304
         }
         -- ── Layout factors ────────────────────────────────────
@@ -443,7 +501,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- HeadType/CamProfile/etc. are read from params (item-level override)
         -- then fall back to typeDef (engine-type default).
         -- TorqueCurve is no longer hand-authored; the shape is fully computed.
-        local isWankel = (Params.Layout == "Wankel")
+        local isWankel = Params.Layout == "Wankel"
+        local idleFrac = idleRPM / max(redlineRPM, 1)
         local VECurve = BuildVECurve(
             Params.HeadType        or TypeDef.HeadType        or "ohc",
             Params.CamProfile      or TypeDef.CamProfile      or "stock",
@@ -452,7 +511,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             Params.FuelDelivery    or TypeDef.FuelDelivery    or "injection",
             TypeDef.IgnitionType   or "spark",
             redlineRPM,
-            isWankel)
+            isWankel, idleFrac)
 
         -- ── 11. Torque curve ──────────────────────────────────────────
         local ct = BuildCurve(VECurve, peakTorque, redlineRPM)
