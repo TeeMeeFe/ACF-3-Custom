@@ -17,7 +17,7 @@ function ENT:ACF_UpdateOverlayState(State)
     State:AddKeyValue("Power", ("%s kW / %s hp @%s RPM"):format(Round(self.PeakPower.InKW), Round(self.PeakPower.InHP), Round(self.PeakPower.AtRPM)))
     State:AddKeyValue("Torque", ("%s Nm / %s ft-lb @%s RPM"):format(Round(self.PeakTorque.InNm), Round(self.PeakTorque.InFtLb), Round(self.PeakTorque.AtRPM)))
     -- Unit conversion on the temperature, from Degrees Kelvin to Celcius
-    State:AddKeyValue("Temperature", ("Water: %s°C / Oil: %s°C"):format(self.Temperature.Water - 273.15, self.Temperature.Oil - 273.15))
+    State:AddKeyValue("Temperature", ("Water: %s°C / Oil: %s°C"):format(Round(self.Temperature.Coolant, 1) - 273.15, Round(self.Temperature.Oil, 1) - 273.15))
     State:AddKeyValue("Powerband", ("%s - %s RPM  Δ%s RPM"):format(Round(self.PowerBand.Min), Round(self.PowerBand.Max), Round(self.PowerBand.Band)))
     State:AddKeyValue("Redline", ("%s RPM"):format(Round(self.RedlineRPM)))
 end

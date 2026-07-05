@@ -12,7 +12,7 @@ local function CreateMenu(Menu)
     Menu:AddLabel("Allows you to efficiently cool down and stabilize an engine's temperature.")
 
     local RadiatorClass = Classes.GetTypeByName("acf_radiator")
-    local TypeSelector  = Classes.CreateTypeSelector(Menu, RadiatorClass, "RadiatorType")
+    local TypeSelector  = Classes.CreateTypeSelector(Menu, RadiatorClass, "Radiator")
     local ClassList     = TypeSelector.ComboBox
 
     -- Ideally the rest of the menus would go here or in the base radiator class.
@@ -27,12 +27,12 @@ local function CreateMenu(Menu)
     -- TLDR: This menu sucks r/bigdickproblems and needs to be rewritten. 
     if ClassList and ClassList.Selected then
         local TypeName = ACF.Classes.GetTypeName(ClassList.Selected)
-        ACF.SetClientData("RadiatorType", TypeName)
+        ACF.SetClientData("Radiator", TypeName)
     end
 
     function TypeSelector.OnTypeChanged(TypeObj)
         local TypeName = ACF.Classes.GetTypeName(TypeObj)
-        ACF.SetClientData("RadiatorType", TypeName)
+        ACF.SetClientData("Radiator", TypeName)
     end
 end
 

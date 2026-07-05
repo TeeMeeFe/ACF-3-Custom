@@ -1,7 +1,8 @@
-ACF.Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.RadiatorType", function()
-    CLASS.Name = "Block Radiator"
+ACF.Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.BaseRadiator", function()
+    CLASS.Name        = "Block Radiator"
     CLASS.Description = "For when a standard radiator is just not enough..."
-    CLASS.Model = "models/radiators/Radiator_big.mdl"
+    CLASS.Model       = "models/radiators/Radiator_big.mdl"
+    CLASS.IsBlock     = true -- This is a class that's sizeable on a X,Y,Z basis.
 
     MENU_FIELD("Number", "RadiatorSizeX", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
     MENU_FIELD("Number", "RadiatorSizeY", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})

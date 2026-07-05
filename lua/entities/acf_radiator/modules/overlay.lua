@@ -1,5 +1,6 @@
 --local ACF = ACF
---local Round = math.Round
+local Round = math.Round
+local abs = math.abs
 
 function ENT:ACF_UpdateOverlayState(State)
     if self.Active then
@@ -12,10 +13,21 @@ function ENT:ACF_UpdateOverlayState(State)
         State:AddWarning("WARNING: Leaking!")
     end
 
-    --local FuelTypeID = self.FuelType
-    --local FuelType   = Classes.FuelTypes.Get(FuelTypeID)
+    local CMix = self.Mixture
+    local MisteryText
+    if CMix <= 0 then
+        MisteryText = "Pure 100% Water"
+    elseif CMix < 1 then
+        MisteryText = ("Water: %s%s, Glycol: %s%s"):format(Round(abs(1 - CMix) * 100), "%", Round(CMix * 100), "%")
+    else
+        MisteryText = "Pure 100% Glycol"
+    end
 
-    State:AddKeyValue("Fluid Type", "50% Glycerol, 50% Water")
+    State:AddKeyValue("Type", self.Name)
+    if not self.IsBlock then
+        State:AddKeyValue("Scale", self.ACF.Scale)
+    end
+    State:AddKeyValue("Fluid Type", MisteryText)
     -- Unit conversion on the temperature, from Degrees Kelvin to Celcius
     State:AddKeyValue("Temperature", ("%s°C"):format(self.Temperature - 273.15))
 

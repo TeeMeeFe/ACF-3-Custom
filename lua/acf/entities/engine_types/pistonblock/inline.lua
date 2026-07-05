@@ -10,7 +10,7 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
     CLASS.Model                = "models/engines/inline4s.mdl"
     CLASS.Layout               = "Inline"
     CLASS.IsScalable           = true
-    CLASS.CubicReductionFactor = 0.85 -- Inverse ratio of empty mass volume an engine has, so it doesn't scale like if it was a solid piece.
+    CLASS.CubicReductionFactor = 0.75 -- Inverse ratio of empty mass volume an engine has, so it doesn't scale like if it was a solid piece.
     CLASS.Sign                 = "I"
     -- These attributes would be private if we had actual scaffolding for that
     local __INLINE_BAL = { [2] = 0.72, [3] = 0.78, [4] = 0.84, [5] = 0.88, [6] = 0.96, [7] = 0.98, [8] = 1.00 }
@@ -38,12 +38,17 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
         }
     end
 
-    function CLASS.Compute(_, Layout, Params)
+    function CLASS.Compute(_, Layout, Params, ...)
         local BASE = BASE
+        local Args = unpack({...}) -- Unpack any extra args and store them here
 
         -- Append the layout and sign fields
-        Params.Layout = CLASS.Layout
-        Params.Sign   = CLASS.Sign
+        Params.Layout       = CLASS.Layout
+        Params.Sign         = CLASS.Sign
+        Params.Efficiency   = Args.Efficiency
+        Params.IgnitionType = Args.IgnitionType
+        Params.PistonSpeed  = Args.PistonSpeed
+        Params.TorqueScale  = Args.TorqueScale
 
         -- The base class has the implementation of this method, so we redict this info there instead
         local Computed = BASE.Compute(CLASS, Layout, Params)

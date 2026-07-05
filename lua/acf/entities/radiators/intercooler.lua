@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.Radiators.Intercooler", "ACF.Radiators.RadiatorType", function()
+ACF.Classes.DefineClass("ACF.Radiators.Intercooler", "ACF.Radiators.BaseRadiator", function()
     CLASS.Name = "Standard Intercooler"
     CLASS.Description = "A radiator meant to cool down engine intake gas temperature."
     CLASS.Model = "models/radiators/Radiator_small.mdl"

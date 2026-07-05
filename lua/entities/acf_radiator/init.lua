@@ -9,3 +9,4 @@ ENT.ACF_HealthUpdatesWireOverlay  = true
 
 include("modules/spawning.lua")
 include("modules/overlay.lua")
+include("modules/state.lua")

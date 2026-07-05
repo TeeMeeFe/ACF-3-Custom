@@ -205,16 +205,24 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             return t * t * (3 - 2 * t)
         end
 
-        -- ── Valve-train shape parameters ─────────────────────────
-        -- All values are RPM fractions (0–1, relative to redline).
-        -- rise_end:    RPM fraction where the VE plateau begins.
-        -- fall_start:  RPM fraction where the rolloff begins.
-        -- fall_end:    RPM fraction where VE reaches zero.
+        -- ── Valve-train modifiers ──────────────────────────────────
+        -- Relative nudges applied on top of the selected base shape (PETROL_SHAPE
+        -- or DIESEL_SHAPE) — NOT a base shape themselves. "ohc" is the zero-shift
+        -- reference (most common modern configuration), so its modifier is a
+        -- no-op; the others are expressed as deltas from it.
+        --   rise_shift: added to the base's rise_end.
+        --   fall_shift: added to the base's fall_start.
+        --   fall_k:     divides the base's fall width (>1 steeper/narrower,
+        --               <1 shallower/wider) — same convention as CAM_MOD.fall_k.
+        -- Applying the same relative nudge to either base means a pushrod head
+        -- shifts a diesel curve earlier/narrower by the same proportion it would
+        -- shift a petrol curve — valve gear affects breathing character somewhat
+        -- even under compression ignition, just less dominantly than fuel type.
         local HEAD_SHAPE = {
-            pushrod = { rise_end = 0.40, fall_start = 0.62, fall_end = 0.92 },
-            ohc     = { rise_end = 0.45, fall_start = 0.70, fall_end = 0.96 },
-            dohc    = { rise_end = 0.50, fall_start = 0.77, fall_end = 1.00 },
-            none    = { rise_end = 0.43, fall_start = 0.67, fall_end = 0.94 },
+            pushrod = { rise_shift = -0.05, fall_shift = -0.08, fall_k = 0.8667 },
+            ohc     = { rise_shift =  0.00, fall_shift =  0.00, fall_k = 1.0000 },
+            dohc    = { rise_shift =  0.05, fall_shift =  0.07, fall_k = 1.1304 },
+            none    = { rise_shift = -0.02, fall_shift = -0.03, fall_k = 0.9630 },
         }
 
         -- shift:  added to fall_start and fall_end (positive → peak shifts to higher RPM).
@@ -228,44 +236,50 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             none    = { shift =  0.00, fall_k = 1.00 },
         }
 
-        local VE_SAMPLES        = 24     -- resolution of the sampled output array
-        -- Minimum width (RPM fraction of redline) of the continued rise from idle
-        -- up to full plateau. Below idle the curve is held at 0 — the engine isn't
-        -- in its running torque regime below idle (that's the cranking/stalling
-        -- domain, handled separately by the starter/crank-torque model in
-        -- Crankshaft). AT idle itself the curve must already be comfortably
-        -- non-zero (see VE_IDLE_FRACTION below) or the engine has no torque to
-        -- overcome its own friction and stalls the instant it reaches idle.
+        -- ── Base combustion-character curves ──────────────────────
+        -- These are the two fundamentally different torque-delivery shapes,
+        -- selected by IgnitionType. Everything else (HEAD_SHAPE, CAM_MOD,
+        -- runner length) is a MODIFIER applied on top of whichever base is
+        -- selected — valve gear and cam tuning nudge the curve, but they don't
+        -- change which combustion regime it belongs to.
+        --
+        -- PETROL_SHAPE (spark ignition, Otto cycle):
+        --   Torque delivery is governed by breathing dynamics — cylinder fill
+        --   improves through low-mid RPM as intake resonance and valve overlap
+        --   become effective, peaks, then degrades from valve float and reduced
+        --   time-per-cycle at high RPM. A gradual bell curve.
+        --
+        -- DIESEL_SHAPE (compression ignition):
+        --   Torque delivery is governed by turbo boost availability and injector
+        --   fuel-quantity/smoke limits, not breathing dynamics.
+        --     • Full torque arrives fast and early (turbo diesels are known for
+        --       near-peak torque just above idle) → rise_end sits much lower
+        --       than petrol.
+        --     • Torque then holds nearly FLAT across most of the operating range
+        --       → fall_start sits much later than petrol, giving a plateau
+        --       roughly twice as wide.
+        --     • The falloff is a STEEP, NARROW cliff rather than a gradual
+        --       rolloff — less crank-angle time per cycle to inject/burn the
+        --       full charge at high RPM, and turbo boost collapses quickly once
+        --       exhaust energy drops.
+        local PETROL_SHAPE = { rise_end = 0.45, fall_start = 0.70, fall_end = 0.96 }
+        local DIESEL_SHAPE = { rise_end = 0.28, fall_start = 0.86, fall_end = 1.00 }
+
+        -- Volumetric Efficiency constants. From these we build the curve. Still needs tuning...
+        local VE_SAMPLES          = 24    -- resolution of the sampled output array
         local VE_RISE_SHARP_WIDTH = 0.05
-        -- Fraction of redline BELOW idle where the curve leaves zero and begins
-        -- climbing toward the idle value. A short pre-idle ramp rather than an
-        -- instant step avoids a discontinuous jump right as the engine crosses
-        -- into its running domain.
         local VE_PRE_IDLE_WIDTH   = 0.06
-        -- VE value (fraction of peak) that the curve GUARANTEES at idleFrac itself.
-        -- This is what makes idle self-sustaining: a running engine at idle must
-        -- produce enough torque to overcome its own internal friction, so VE at
-        -- idle cannot be allowed to land near zero regardless of head/cam/runner
-        -- shape. 0.35 is a representative real-world idle VE fraction — well
-        -- below peak-torque VE, but decisively non-zero.
         local VE_IDLE_FRACTION    = 0.35
-        -- Idle fraction is clamped below this so a pathologically high idle RPM
-        -- (e.g. a heavily IdleRPMMult'd layout) can't collapse the curve's usable
-        -- range to nothing.
-        local VE_MAX_IDLE_FRAC    = 0.35
-        local V_SOUND           = ACF.SpeedOfSound    -- m/s  (20°C air, close enough for intake calc)
-        local RES_BONUS         = 0.06   -- max Gaussian VE bonus from intake resonance
-        local RES_WIDTH         = 0.15   -- Gaussian σ in RPM-fraction units
-        local SCAV_BONUS        = 0.04   -- max header-scavenging VE bonus
-        local SCAV_PEAK         = 0.70   -- RPM fraction of peak scavenging
-        local SCAV_WIDTH        = 0.20   -- Gaussian σ
-        local CARB_KICK_IN      = 0.82   -- RPM fraction where carb venturi saturation begins
-        local CARB_PENALTY      = 0.07   -- VE fraction lost at redline (carburetor only)
-        local DIESEL_LIMIT_S    = 0.70   -- RPM fraction where diesel VE starts to be throttled
-        local DIESEL_LIMIT_E    = 0.86   -- RPM fraction where diesel VE suppression is full
-        local DIESEL_SUPPRESS   = 0.35   -- Max fractional VE loss at the diesel RPM limit
-        local RUNNER_REF_CM     = 22.0
-        local RUNNER_SHIFT_K    = 0.0025   -- RPM-fraction shift per cm of runner length difference
+        local V_SOUND             = ACF.SpeedOfSound    -- m/s  (20°C air, close enough for intake calc)
+        local RES_BONUS           = 0.06   -- max Gaussian VE bonus from intake resonance
+        local RES_WIDTH           = 0.15   -- Gaussian σ in RPM-fraction units
+        local SCAV_BONUS          = 0.04   -- max header-scavenging VE bonus
+        local SCAV_PEAK           = 0.70   -- RPM fraction of peak scavenging
+        local SCAV_WIDTH          = 0.20   -- Gaussian σ
+        local CARB_KICK_IN        = 0.82   -- RPM fraction where carb venturi saturation begins
+        local CARB_PENALTY        = 0.07   -- VE fraction lost at redline (carburetor only)
+        local RUNNER_REF_CM       = 22.0   -- Default intake runner reference in centimeters
+        local RUNNER_SHIFT_K      = 0.0025 -- RPM-fraction shift per cm of runner length difference
 
         --- Two-segment idle-anchored rise.  Guarantees ve(idleFrac) == VE_IDLE_FRACTION
         --- exactly, regardless of how far away rise_end sits — a single smoothstep
@@ -303,11 +317,9 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         ---   isWankel      → replaces valve-train shape with Wankel port-timing model
         ---
         --- Returns a flat array of VE_SAMPLES normalised values evenly spaced 0→redline.
-        local function BuildVECurve(headType, camProfile, runnerLen_cm,
-                                    exhaustType, fuelDelivery, ignType,
-                                    redlineRPM, isWankel, idleFrac)
+        local function BuildVECurve(headType, camProfile, runnerLen_cm, fuelDelivery, ignType, redlineRPM, isWankel, idleFrac)
 
-            idleFrac = clamp(idleFrac or 0, 0, VE_MAX_IDLE_FRAC)
+            idleFrac = clamp(idleFrac or 0, 0, 0.35)
 
             -- ── Wankel port-timing model (overrides valve-train entirely) ──
             if isWankel then
@@ -332,25 +344,30 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
                 return pts
             end
 
-            -- ── Valve-train base shape ─────────────────────────────
-            local head = HEAD_SHAPE[headType] or HEAD_SHAPE.ohc
+            -- IgnitionType selects the fundamental combustion-character curve —
+            -- petrol's gradual bell shape or diesel's early-plateau-then-cliff
+            -- shape. HeadType no longer selects a shape outright; it MODIFIES
+            -- whichever base was selected (see HEAD_SHAPE comment above).
+            local base = (ignType == "glow") and DIESEL_SHAPE or PETROL_SHAPE
+            local hmod = HEAD_SHAPE[headType] or HEAD_SHAPE.ohc
             local cam  = CAM_MOD[camProfile]  or CAM_MOD.stock
 
             -- Runner length shifts the plateau onset: long runners bias toward low RPM,
             -- short runners bias toward high RPM.
             local runner_shift = (RUNNER_REF_CM - (runnerLen_cm or RUNNER_REF_CM)) * RUNNER_SHIFT_K
 
-            -- Rise completes at the head's natural plateau point, UNLESS idle sits
-            -- close enough to it that the guaranteed sharp post-idle window would
-            -- overrun it — in that case the sharp window wins so the rise never
-            -- inverts (this only matters for unusually high-idle layouts).
-            local rise_end = max(head.rise_end, idleFrac + VE_RISE_SHARP_WIDTH)
+            -- Rise completes at the (base + head modifier) plateau point, UNLESS
+            -- idle sits close enough to it that the guaranteed sharp post-idle
+            -- window would overrun it. In that case the sharp window wins so the
+            -- rise never inverts (this only matters for unusually high-idle layouts).
+            local rise_end = math.max(base.rise_end + hmod.rise_shift, idleFrac + VE_RISE_SHARP_WIDTH)
 
-            local fall_start = head.fall_start + cam.shift + runner_shift
-            local fall_width  = (head.fall_end - head.fall_start) / cam.fall_k
-            local fall_end    = fall_start + fall_width
+            local base_fall_width = base.fall_end - base.fall_start
+            local fall_start      = base.fall_start + hmod.fall_shift + cam.shift + runner_shift
+            local fall_width      = base_fall_width / hmod.fall_k / cam.fall_k
+            local fall_end        = fall_start + fall_width
             -- Safety clamp: fall can never begin before the rise has finished,
-            -- which would otherwise invert the curve for extreme cam/runner combos.
+            -- which would otherwise invert the curve for extreme head/cam/runner combos.
             if fall_start <= rise_end then
                 fall_start = rise_end + 0.05
                 fall_end   = fall_start + fall_width
@@ -377,23 +394,17 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
                 local dr = (t - resonance_frac) / RES_WIDTH
                 ve = ve + ve * RES_BONUS * exp(-0.5 * dr * dr)
 
+                --[[
                 -- Header scavenging (upper-mid band bonus)
                 if exhaustType == "header" then
                     local ds = (t - SCAV_PEAK) / SCAV_WIDTH
                     ve = ve + ve * SCAV_BONUS * exp(-0.5 * ds * ds)
                 end
-
+                ]]--
                 -- Carburetor high-RPM penalty (venturi saturation)
                 if fuelDelivery == "carburetor" and t > CARB_KICK_IN then
                     local pen = ((t - CARB_KICK_IN) / (1 - CARB_KICK_IN)) * CARB_PENALTY
                     ve = ve * (1 - pen)
-                end
-
-                -- Diesel/glow ignition: high-RPM VE suppression
-                -- (cetane burn-rate and glow-plug thermal limit cap effective RPM)
-                if ignType == "glow" then
-                    local suppress = smoothstep(DIESEL_LIMIT_S, DIESEL_LIMIT_E, t)
-                    ve = ve * (1 - suppress * DIESEL_SUPPRESS)
                 end
 
                 pts[i] = clamp(ve, 0, 1)
@@ -407,20 +418,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
             return pts
         end
 
-        -- Insane coping cause i fucked up with my clanker spewing shit like this, will fix this in another time
-        -- TypeDef would be the fuel type being used, taken from old engine code. We're using petrol here
-        local TypeDef = {
-            PistonSpeed = 20,
-            TorqueScale = 0.25,
-            Efficiency  = 0.304
-        }
         -- ── Layout factors ────────────────────────────────────
-
         local Bore_cm      = Params.Bore
         local Stroke_cm    = Params.Stroke
         local Clearance_cm = Params.Clearance
         local Pistons      = Params.Pistons
-        local PistonSpeed  = TypeDef.PistonSpeed or CLASS.DEFAULT_PISTON_SPEED
+        local PistonSpeed  = Params.PistonSpeed or CLASS.DEFAULT_PISTON_SPEED
 
         -- Validate clearance — must be positive and less than stroke
         Clearance_cm = clamp(Clearance_cm, 0.05, Stroke_cm - 0.01)
@@ -451,7 +454,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
 
         -- ── 4. Peak torque via BMEP ───────────────────────────
         -- T = BMEP_Pa × V_total_m³ / (4π)    [4-stroke cycle]
-        local BMEP_Pa    = TypeDef.TorqueScale * CLASS.BMEP_Scale * 1e5
+        local BMEP_Pa    = Params.TorqueScale * CLASS.BMEP_Scale * 1e5
         -- Wankel rotary: each rotor provides WANKEL_POWER_STROKES combustion
         -- events per shaft revolution instead of the 0.5 of a 4-stroke piston.
         -- BMEP formula stays the same (it's per-displacement), but we apply
@@ -478,10 +481,10 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         -- η_real = CLASS.ETA_FRIC × η_otto
         -- BSFC   = 1 / (η_real × CLASS.LHV_KWH)          [kg/kWh, theoretical]
         -- Corrected by type ratio and layout BSFC multiplier:
-        --   BSFC_eff = BSFC_theoretical × (typeBSFC / REF_BSFC) × BSFCMult
+        -- BSFC_eff = BSFC_theoretical × (typeBSFC / REF_BSFC) × BSFCMult
         local eta_otto  = 1 - (1 / CR) ^ (CLASS.Gamma  - 1)
         local BSFC_base = 1 / (CLASS.ETA_FRIC * eta_otto * CLASS.LHV_KWH)
-        local typeCorr  = (TypeDef.Efficiency or CLASS.REF_BSFC) / CLASS.REF_BSFC
+        local typeCorr  = (Params.Efficiency or CLASS.REF_BSFC) / CLASS.REF_BSFC
         local BSFC_eff  = BSFC_base * typeCorr * (LayoutFactors.BSFCMult or 1.0)
 
         -- ── 8. Heat generation coefficient ────────────────────
@@ -498,18 +501,19 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", func
         local inertia = I_base * (LayoutFactors.InertiaFactor or 1.0)
 
         -- ── 10. Torque curve — derived from physical parameters ───
-        -- HeadType/CamProfile/etc. are read from params (item-level override)
-        -- then fall back to typeDef (engine-type default).
-        -- TorqueCurve is no longer hand-authored; the shape is fully computed.
+        -- HeadType/CamProfile/etc; Are read from Params and are provided when the engine is first instanced.
+        -- These parameters are yet not calculated by the client when it first attempts to spawn the engine
+        -- So defaults are provided in their places instead. 
+        -- TorqueCurve is no longer hand-made but instead the shape is fully computed.
         local isWankel = Params.Layout == "Wankel"
         local idleFrac = idleRPM / max(redlineRPM, 1)
         local VECurve = BuildVECurve(
-            Params.HeadType        or TypeDef.HeadType        or "ohc",
-            Params.CamProfile      or TypeDef.CamProfile      or "stock",
-            Params.RunnerLength_cm or TypeDef.RunnerLength_cm or 22,
-            Params.ExhaustType     or TypeDef.ExhaustType     or "stock",
-            Params.FuelDelivery    or TypeDef.FuelDelivery    or "injection",
-            TypeDef.IgnitionType   or "spark",
+            Params.HeadType        or "ohc",
+            Params.CamProfile      or "stock",
+            Params.RunnerLength_cm or 22,
+            --Params.ExhaustType     or "stock",
+            Params.FuelDelivery    or "injection",
+            Params.IgnitionType,
             redlineRPM,
             isWankel, idleFrac)
 

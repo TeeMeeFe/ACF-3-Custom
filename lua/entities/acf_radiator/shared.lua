@@ -9,11 +9,12 @@ ENT.ACF_PreventArmoring = true
 ENT.IsACFRadiator = true
 
 ACF.Entities.AutoRegisterV2(function()
-    FIELD("ACF.Radiators.RadiatorType", "RadiatorType", {
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "Radiator", {
         InstantiateTypeForDefault = "ACF.Radiators.Standard",
         OnlyAllowSubtypes = true
     })
-    MENU_FIELD("Number", "Scale", {InstantiateTypeForDefault = "ACF.Radiators.Standard", OnlyAllowSubtypes = true})
+    MENU_FIELD("Number", "RadiatorScale", {Min = 0.5, Max = 2.5, Default = 1, Decimals = 1})
+    MENU_FIELD("Number", "CoolantMix", {Min = 0, Max = 1, Default = 0.5, Decimals = 2})
     MENU_FIELD("Number", "RadiatorSizeX", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
     MENU_FIELD("Number", "RadiatorSizeY", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
     MENU_FIELD("Number", "RadiatorSizeZ", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
@@ -33,3 +34,7 @@ ENT.ACF_StaticWireOutputs = {
     "Leaking (If this radiator is leaking its contents.)",
     "Entity (The radiator entity itself.) [ENTITY]",
 }
+-- Returns the radiator instance backing this entity.
+function ENT:GetRadiator()
+    return self:ACF_GetUserVar("Radiator")
+end

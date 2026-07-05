@@ -24,17 +24,31 @@ local function UpdateEngine(Entity, Class)
 	local TypeFields = Classes.GetTypeByName(Entity.EngineClass)
 	local EngineClass = Entity.EngineClass
 	local FuelTypes = {}
+	local ExtraEngineFields = {}
 
+	--PrintTable({EngineClass, TypeFields})
 	-- Shitty hack to get the type of fuel used for these engine Classes
 	-- This is the same hack used for the menu creation in piston_block/inline.lua
 	if EngineClass == "ACF.EngineTypes.GenericPetrol" then
 		FuelTypes = {["ACF.FuelTypes.Petrol"] = true}
+		ExtraEngineFields = {
+			PistonSpeed  = 20, -- m/s
+			Efficiency   = TypeFields.Efficiency,
+			TorqueScale  = TypeFields.TorqueScale,
+			IgnitionType = "spark"
+		}
 	elseif EngineClass == "ACF.EngineTypes.GenericDiesel" then
 		FuelTypes = {["ACF.FuelTypes.Diesel"] = true}
+		ExtraEngineFields = {
+			PistonSpeed  = 13, -- m/s
+			Efficiency   = TypeFields.Efficiency,
+			TorqueScale  = TypeFields.TorqueScale,
+			IgnitionType = "glow"
+		}
 	end
 
 	local LayoutFactors = Class.GetLayoutFactors(Entity.Pistons)
-	local Compute = Class.Compute(Sel, LayoutFactors, Params)
+	local Compute = Class.Compute(Sel, LayoutFactors, Params, ExtraEngineFields)
 
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
@@ -91,6 +105,7 @@ local function UpdateEngine(Entity, Class)
 
 	Contraption.SetMass(Entity, Entity.Mass)
 
+	PrintTable({Compute})
 	-- Calculate base fuel usage
 	--if Type.CalculateFuelUsage then
 	---	Entity.FuelUse = Type.CalculateFuelUsage(Entity)
@@ -108,6 +123,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 
 	self.ACF 				= {}
 	self.Active        		= false
+	self.AmbientTemp        = ACF.AmbientTemperature
 	self.Engine             = Engine
 	self.EngineType 		= Classes.GetTypeName(Engine)
 	self.EngineClass   		= ClientData.EngineClass
@@ -134,7 +150,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.State         		= "Idle"
 	self.SoundBanks    		= {}
 	self.RevLimiterEnabled 	= true
-	self.Temperature   		= {Water = ACF.AmbientTemperature, Oil = ACF.AmbientTemperature}
+	self.Temperature   		= {Coolant = self.AmbientTemp, Oil = self.AmbientTemp}
+	self.WaterPumpFlow		= 0
 	self.Pistons 	   		= ClientData.CustomEnginePistons
 	self.Bore          		= ClientData.CustomEngineBore
 	self.Stroke        		= ClientData.CustomEngineStroke

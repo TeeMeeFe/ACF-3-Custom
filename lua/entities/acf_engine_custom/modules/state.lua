@@ -17,7 +17,7 @@ local UnlinkGbxSound = "physics/metal/metal_box_impact_bullet%s.wav"
 local IsValid        = IsValid
 local Clamp          = math.Clamp
 local Round          = math.Round
--- local Remap          = math.Remap
+local random         = math.random
 local max            = math.max
 local min            = math.min
 local TimerCreate    = timer.Create
@@ -48,7 +48,7 @@ local function CheckDistantFuelTanks(Engine)
 
     for Tank in pairs(Engine.FuelTanks) do
         if EnginePos:DistToSqr(Tank:GetPos()) > MaxDistance then
-            local Sound = UnlinkGbxSound:format(math.random(1, 3))
+            local Sound = UnlinkGbxSound:format(random(1, 3))
 
             Sounds.SendSound(Engine, Sound, 70, 100, 1)
             Sounds.SendSound(Tank, Sound, 70, 100, 1)
@@ -81,7 +81,7 @@ local function CheckDistantRadiators(Engine)
 
     for Rad in pairs(Engine.Radiators) do
         if EnginePos:DistToSqr(Rad:GetPos()) > MaxRadDistance then
-            local Sound = UnlinkRadSound:format(math.random(1, 2))
+            local Sound = UnlinkRadSound:format(random(1, 2))
 
             Sounds.SendSound(Engine, Sound, 85, 100, 1)
             Sounds.SendSound(Rad, Sound, 85, 100, 1)
@@ -160,7 +160,7 @@ do -- Random timer crew stuff
     function ENT:UpdateFuelMod(cfg)
         local Propagator = self:FindPropagator(cfg)
         local Val = Propagator and Propagator.FuelCrewMod or 0
-        self.FuelCrewMod = math.Clamp(Val, ACF.CrewFallbackCoef, 1)
+        self.FuelCrewMod = Clamp(Val, ACF.CrewFallbackCoef, 1)
         return self.FuelCrewMod
     end
 end
@@ -186,6 +186,7 @@ do -- Actual engine rpm and torque calculations
     function ENT:Think()
         local SelfTbl = ENTITY.GetTable(self)
 
+        self:CalcTemp(SelfTbl)
         if not SelfTbl.Active then return end
         if SelfTbl.Disabled then return end
 
@@ -209,7 +210,6 @@ do -- Actual engine rpm and torque calculations
 
         local ClockTime  = Clock.CurTime
         local DeltaTime  = ClockTime - SelfTbl.LastThink
-        -- Unused this iteration due to me working with a broken class-rewrite branch(awaiting on march to complete his work)
         local FuelTank   = GetNextFuelTank(SelfTbl)
         local IsElectric = SelfTbl.IsElectric
         local LimitRPM   = SelfTbl.RedlineRPM
