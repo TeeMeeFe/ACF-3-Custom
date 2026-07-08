@@ -1,5 +1,5 @@
 -- Base turbine block class definition
-ACF.Classes.DefineClass("ACF.Engines.TurbineBlock", "ACF.Engines.BlockType", function()
+ACF.Classes.DefineClass("ACF.Engines.TurbineBlock", "ACF.Engines.BaseEngineBlock", function()
     CLASS.Name = "Turbine Block Class"
     CLASS.Description = "The base class for any and all types of turbines."
     CLASS.ToolDesc    = "Attempts to spawn the selected turbine."

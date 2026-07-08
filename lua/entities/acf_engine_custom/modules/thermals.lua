@@ -49,20 +49,7 @@ local K_OIL_AMB       = 0.045 / 70    -- 6.43e-4
 local K_OC_BASE       = 0.001   -- game-units/(s·K) when active and at idle
 
 -- Coolant level
-local COOL_TOTAL_VOL  = 6.5     -- L
-local COOL_LEVEL_WARN = 0.50
 local COOL_LEVEL_MIN  = 0.15
-local COOL_LEAK_DECAY = 0.05    -- /s exponential decay
-
--- Oil pressure
-local OIL_P_MIN_RUN    = 1.0
-local OIL_P_RELIEF     = 5.0
-local OIL_TILT_WARN    = 50     -- ° default; overridden by Geo layout
-local OIL_TILT_STARVE  = 90
-local OIL_TAU_STARVE   = 5.0
-local OIL_TAU_RECOVER  = 2.0
-local OIL_STARV_WARN   = 0.10
-local OIL_STARV_SEIZE  = 1.0
 
 --===============================================================================================--
 -- Local Funcs and Vars
@@ -131,8 +118,8 @@ do -- State Handling
         end
         -- RadiatorCapacity (acf_radiator, default 1.0 if none linked) multiplies heat rejection:
         -- < 1.0 = undersized/damaged core,
-        -- > 1.0 = performance/heavy-duty radiator with more rejection margin.
-        local RadCap = 1 --SelfTbl.RadiatorCapacity or 1.0
+        -- > 1.0 = bigger radiator with more rejection margin.
+        local RadCap = 1
 
         -- Heat Out Coolant
         local HOCool = K_COOL * RadCap * Q * RHO_COOLANT * CP_COOLANT * (CT - AmbTemp) * ThermFrac * DeltaTime
@@ -157,7 +144,7 @@ do -- State Handling
         SelfTbl.Temperature.Oil     = max(AmbTemp, OT + HeatToOil - HOOil - ExchangedHeat)
 
         --SelfTbl.LastThink = ClockTime
-        PrintTable({RPM, TotalHeat, CT, OT, Q, HeatToCool, HeatToOil, ExchangedHeat})
+        --PrintTable({RPM, TotalHeat, CT, OT, Q, HeatToCool, HeatToOil, ExchangedHeat})
 
         return true
     end

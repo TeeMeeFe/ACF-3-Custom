@@ -9,10 +9,7 @@ ENT.ACF_PreventArmoring = true
 ENT.IsACFCustomEngine = true
 
 ACF.Entities.AutoRegisterV2(function()
-    MENU_FIELD("ACF.Engines.BlockType", "BlockType", {InstantiateTypeForDefault = "ACF.Engines.PistonBlock", OnlyAllowSubtypes = true})
-    --FIELD("ACF.Engines.Model", "EngineBlockModel", {Model = "models/holograms/cube.mdl"})
-    --LINKED_ENTITY_FIELD("engine_custom", {AcceptableClasses = {acf_battery = false, acf_radiator = false}})
-    --LINKED_ARRAY_FIELD("fueltanks", {AcceptableClasses = {acf_fueltank = true}})
+    MENU_FIELD("ACF.Engines.BaseEngineBlock", "BlockType", {InstantiateTypeForDefault = "ACF.Engines.PistonBlock", OnlyAllowSubtypes = true})
 
     -- Nothing to validate: the Engine field is constrained to ACF.Engines.* subtypes by the serializer.
     function CLASS:VerifyData() end
@@ -38,7 +35,6 @@ ENT.ACF_StaticWireOutputs = {
 -- This doesn't work, as we only get the inmediate BlockType class defined above,
 -- but not its children till the very last one with all the field info we need :(
 -- Returns the blocktype instance backing this entity.
---[[function ENT:GetBlockType()
+function ENT:GetBlockType()
     return self:ACF_GetUserVar("BlockType")
 end
-]]

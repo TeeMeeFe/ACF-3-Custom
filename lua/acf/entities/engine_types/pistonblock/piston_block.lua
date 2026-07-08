@@ -61,7 +61,7 @@ local sqrt    = math.sqrt
 --
 -- ===========================================================================
 
-ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BlockType", function()
+ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", function()
     CLASS.Name          = "Piston Block Class"
     CLASS.Description   = "The base class for any and all piston engines."
     CLASS.ToolDesc      = "Attempts to spawn the selected piston engine."

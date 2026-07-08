@@ -1,5 +1,5 @@
 -- Base electric block class definition
-ACF.Classes.DefineClass("ACF.Engines.ElectricBlock", "ACF.Engines.BlockType", function()
+ACF.Classes.DefineClass("ACF.Engines.ElectricBlock", "ACF.Engines.BaseEngineBlock", function()
     CLASS.Name        = "Electric Block Class"
     CLASS.Description = "The base class for any and all types of electric motors."
     CLASS.ToolDesc    = "Attempts to spawn the selected electric motor."

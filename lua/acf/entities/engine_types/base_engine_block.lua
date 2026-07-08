@@ -20,11 +20,11 @@
 --     └── ElectricBlock   (layout="electric")   non-piston superclass
 -- ============================================================
 
-ACF.Classes.DefineClass("ACF.Engines.BlockType", function()
-    CLASS.Name          = "Block Type Class"
+ACF.Classes.DefineClass("ACF.Engines.BaseEngineBlock", function()
+    CLASS.Name          = "Base Engine Block Class"
     CLASS.Description   = "The base class for any and all types of engine blocks."
 
-    FIELD("ACF.Engines.BlockType", "BlockType", {"PistonBlock", "ElectricBlock", "TurbineBlock"})
+    MENU_FIELD("ACF.Engines.BaseEngineBlock", "BlockType", {"ACF.Engines.PistonBlock", "ACF.Engines.ElectricBlock", "ACF.Engines.TurbineBlock"})
 end)
 
 --- INSANE coping this is because i must really define what type of engines are we instancing, just for two fields

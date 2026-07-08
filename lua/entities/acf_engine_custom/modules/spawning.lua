@@ -105,7 +105,7 @@ local function UpdateEngine(Entity, Class)
 
 	Contraption.SetMass(Entity, Entity.Mass)
 
-	PrintTable({Compute})
+	--PrintTable({Compute})
 	-- Calculate base fuel usage
 	--if Type.CalculateFuelUsage then
 	---	Entity.FuelUse = Type.CalculateFuelUsage(Entity)
