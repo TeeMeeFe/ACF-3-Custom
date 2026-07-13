@@ -70,7 +70,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
     CLASS.Gamma         = 1.4       -- heat capacity ratio (diatomic air)
     CLASS.LHV_KWH       = 12.222222 -- 44000 / 3600 petrol lower heating value (kWh/kg).
     CLASS.ETA_FRIC      = 0.55      -- Otto → shaft efficiency fraction
-    CLASS.BMEP_Scale    = 40        -- bar per unit of TorqueScale
+    CLASS.BMEP_Scale    = 40        -- Brake Mean Effective Pressure in bar per unit of TorqueScale
     -- Inline engine calibrated mass coefficients
     CLASS.PistonMass_K  = 0.0005    -- kg per cm²
     CLASS.RodMass_K     = 0.0009    -- kg per cm²
@@ -81,7 +81,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
     CLASS.HeatBase      = 0.012
     -- Reference BSFC for type-correction ratio
     CLASS.REF_BSFC      = 0.304     -- kg/kWh  (GenericPetrol)
-    -- Default piston speed limit if TypeDef does not specify one
+    -- Default piston speed limit if Params does not specify one
     CLASS.DEFAULT_PISTON_SPEED = 20 -- m/s
     -- Wankel: power strokes per rotor per shaft revolution
     --CLASS.WANKEL_POWER_STROKES = 3  -- TODO: This shouldn't be here IMHO
@@ -100,24 +100,47 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
     -- ──────────────────────────────────────────────────────────
     --  Torque curve builder (shared by all layouts)
     -- ──────────────────────────────────────────────────────────
-    --- Expand a normalised TorqueCurve array into a Nm lookup table.
-    --- typeCurve: flat array {mult0, mult1, ...} 0-1, evenly spaced over RPM.
+    --- Basically expands a normalised VE array into a Nm lookup table.
+    --- @param table typeCurve: flat array {mult0, mult1, ...} 0-1, evenly spaced over RPM.
+    --- @param number peakTorque: pre-computed maximum or peak torque the engine can possibly generate.
+    --- @param number maxRPM: the upper theorical RPM limit at which point it generates exactly 0 torque.
+    --- @param number idleRPM: RPM at which the engine just idles. 
+    --- @param number dispL: engine displacement in Liters.
+    --- @param number? steps: number of steps to compute. Defaults to 200.
     --- @return table  {Curve:table, Steps:number, Sample:function, PeakPower:table, PeakTorque:table, PowerBand:table}
-    local function BuildCurve(typeCurve, peakTorque, maxRPM, steps)
-        local POWER_BAND_THRESHOLD = 0.80   -- fraction of peak power that defines the band edges
+    local function BuildCurve(typeCurve, peakTorque, maxRPM, idleRPM, dispL, steps)
+        -- Constants
+        local POWER_BAND_THRESHOLD = 0.8 -- Fraction of peak power that defines the band edges
+        local REDLINE_TORQUE_FRAC  = 0.4 -- Fraction of remaining torque past its peak where we setup the redline RPM limiter
+        local FRICTION_RPM_EXP     = 0.6 -- Reference exponent of total rotating assembly friction that increases with RPM. 
+
+        local FRICTION_FMEP_BAR    = 0.52 -- Reference Friction Mean Effective Pressure in bar, at idleRPM. 
+                                          -- This increases proportionally with RPM and inversely with oil temperature,
+                                          -- and we make a reference value by scaling with displacement and idle rpm. 
+                                          -- Props to https://x-engineer.org/mechanical-efficiency-friction-mean-effective-pressure-fmep/
+        local FRICTION_TORQUE_REF  = (FRICTION_FMEP_BAR * 1e5) * (dispL * 1e-3) / (4 * PI) -- ≈ 7.45 Nm for a 1.8L, 850RPM idle, NA engine, be it any layout.
+        local FRICTION_K_FRIC      = FRICTION_TORQUE_REF / (idleRPM ^ FRICTION_RPM_EXP * dispL)
+
         local TWO_PI_OVER_60       = 2 * PI / 60
         local KWTOHP               = ACF.KwToHp
         local NMTOFTLB             = ACF.NmToFtLb
 
+        -- Variables
         steps = steps or 200
-        local n      = #typeCurve
-        local curve  = {}
+        local n       = #typeCurve
+        local t_curve = {}
+        local f_curve = {}
 
         local peakKW          = 0
         local peakPowerAtRPM  = 0
         local peakTorqueAtRPM = 0
 
+        local powerbandMin = 0
+        local powerbandMax = 0
+
         local rpmStep = maxRPM / steps
+
+        local redlineRPM = 0
 
         -- Compute the curve and define peaks 
         for i = 0, steps do
@@ -127,20 +150,38 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             local blend = pos - idx0
             local v0    = typeCurve[idx0 + 1] or 0
             local v1    = typeCurve[idx1 + 1] or 0
-            curve[i]    = peakTorque * (v0 + blend * (v1 - v0))
+            t_curve[i]  = peakTorque * (v0 + blend * (v1 - v0)) -- torque curve
+            f_curve[i]  = FRICTION_K_FRIC * (t_curve[i] ^ FRICTION_RPM_EXP) * dispL -- friction curve
 
-            local torque = curve[i]
+            local torque = t_curve[i]
             local rpm    = rpmStep * i
 
+            -- Get peak torque at RPM (We already know peakTorque)
             if torque >= peakTorque then
                 peakTorqueAtRPM = rpm
             end
 
             local power = torque * (rpm * TWO_PI_OVER_60) * 0.001
 
+            -- Get peak power and at RPM
             if power > peakKW then
                 peakKW         = power
                 peakPowerAtRPM = rpm
+            end
+
+            local threshold = peakKW * POWER_BAND_THRESHOLD
+
+            -- Get the RPM's that make our powerband according to a threshold
+            if power < threshold then
+                powerbandMax = rpm
+            elseif power >= threshold then
+                powerbandMin = rpm
+            end
+
+            local torqueThreshold = peakTorque * REDLINE_TORQUE_FRAC
+
+            if torque >= torqueThreshold then
+                redlineRPM = maxRPM * i / steps
             end
         end
 
@@ -150,52 +191,28 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             local idx0  = floor(frac)
             local idx1  = min(idx0 + 1, steps)
             local blend = frac - idx0
-            local v0    = curve[idx0] or 0
-            local v1    = curve[idx1] or 0
-            return v0 + blend * (v1 - v0)
-        end
-
-        -- Calculate Powerband
-        local powerbandMin = 0
-        local powerbandMax = 0
-
-        local threshold = peakKW * POWER_BAND_THRESHOLD
-
-        for i = 0, steps do
-            local rpm = rpmStep * i
-            local torque = curve[i]
-
-            local power = torque * (rpm * TWO_PI_OVER_60) * 0.001
-
-            if power > threshold then
-                if powerbandMin == 0 then
-                    powerbandMin = rpm
-                end
-
-                powerbandMax = rpm
-            end
+            local t0    = t_curve[idx0] or 0
+            local f0    = f_curve[idx0] or 0
+            local t1    = t_curve[idx1] or 0
+            local f1    = f_curve[idx1] or 0
+            return {t0 + blend * (t1 - t0), f0 + blend * (f1 - f0)}
         end
 
         return {
-            Curve       = curve,
-            Steps       = steps,
-            Sample      = Sample,
-            PeakPower   = {InKW = peakKW, InHP = peakKW * KWTOHP, AtRPM = peakPowerAtRPM},
-            PeakTorque  = {InNm = peakTorque, InFtLb = peakTorque * NMTOFTLB, AtRPM = peakTorqueAtRPM},
-            PowerBand   = {Band = abs(powerbandMax - powerbandMin), Min = powerbandMin, Max = powerbandMax}
+            T_Curve    = t_curve,
+            F_Curve    = f_curve,
+            Steps      = steps,
+            Sample     = Sample,
+            PeakPower  = {InKW = peakKW, InHP = peakKW * KWTOHP, AtRPM = peakPowerAtRPM},
+            PeakTorque = {InNm = peakTorque, InFtLb = peakTorque * NMTOFTLB, AtRPM = peakTorqueAtRPM},
+            PowerBand  = {Band = abs(powerbandMax - powerbandMin), Min = powerbandMin, Max = powerbandMax},
+            RedlineRPM = redlineRPM
         }
     end
 
-
-    --- Must be overridden by each concrete layout.
-    --- Returns a flat table of multipliers — see header for field list.
-    function CLASS.GetLayoutFactors(Params)
-        error("PistonBlock:GetLayoutFactors() must be overridden by layout subclass")
-    end
-
     --- Concrete layouts call this after setting their own GetLayoutFactors.
-    function CLASS.Compute(SuperClass, LayoutFactors, Params)
-        if not SuperClass then return end
+    function CLASS.Compute(SUPER, LayoutFactors, Params)
+        if not SUPER then return end -- TODO: Maybe another check here if its a class?
         if not Params and istable(Params) then return end
         if not LayoutFactors and istable(LayoutFactors) then return end
 
@@ -265,17 +282,17 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         local PETROL_SHAPE = { rise_end = 0.45, fall_start = 0.70, fall_end = 0.96 }
         local DIESEL_SHAPE = { rise_end = 0.28, fall_start = 0.86, fall_end = 1.00 }
 
-        -- Volumetric Efficiency constants. From these we build the curve. Still needs tuning...
-        local VE_SAMPLES          = 24    -- resolution of the sampled output array
-        local VE_RISE_SHARP_WIDTH = 0.05
-        local VE_PRE_IDLE_WIDTH   = 0.06
-        local VE_IDLE_FRACTION    = 0.35
+        -- Volumetric Efficiency constants as fractions from which we build the curve. Still needs tuning...
+        local VE_SAMPLES          = 24   -- resolution of the sampled output array
+        local VE_RISE_SHARP_WIDTH = 0.05 -- fraction of the curve at which engines start picking up in torque
+        local VE_PRE_IDLE_WIDTH   = 0.06 -- width as fraction of the curve where the engine generates almost no torque(before idleRPM)
+        local VE_IDLE_FRACTION    = 0.35 -- fraction of torque generated at idle 
         local V_SOUND             = ACF.SpeedOfSound    -- m/s  (20°C air, close enough for intake calc)
         local RES_BONUS           = 0.06   -- max Gaussian VE bonus from intake resonance
         local RES_WIDTH           = 0.15   -- Gaussian σ in RPM-fraction units
-        local SCAV_BONUS          = 0.04   -- max header-scavenging VE bonus
-        local SCAV_PEAK           = 0.70   -- RPM fraction of peak scavenging
-        local SCAV_WIDTH          = 0.20   -- Gaussian σ
+        -- local SCAV_BONUS          = 0.04   -- max header-scavenging VE bonus
+        -- local SCAV_PEAK           = 0.70   -- RPM fraction of peak scavenging
+        -- local SCAV_WIDTH          = 0.20   -- Gaussian σ
         local CARB_KICK_IN        = 0.82   -- RPM fraction where carb venturi saturation begins
         local CARB_PENALTY        = 0.07   -- VE fraction lost at redline (carburetor only)
         local RUNNER_REF_CM       = 22.0   -- Default intake runner reference in centimeters
@@ -445,12 +462,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         local PistonsMass = Area * Pistons * CLASS.PistonMass_K
         local RodsMass    = V_total_cm3 * CLASS.RodMass_K
         local CrankMass   = V_total_cm3 * CLASS.CrankMass_K
-        local BlockMass   = V_total_cm3 * CLASS.BlockMass_K * SuperClass.CubicReductionFactor
-        local HeadMass    = V_total_cm3 * CLASS.HeadMass_K * SuperClass.CubicReductionFactor
+        local BlockMass   = V_total_cm3 * CLASS.BlockMass_K * SUPER.CubicReductionFactor
+        local HeadMass    = V_total_cm3 * CLASS.HeadMass_K * SUPER.CubicReductionFactor
 
         local ModelMass = PistonsMass + RodsMass + CrankMass + BlockMass + HeadMass
 
-        -- local ModelMass = BaseMass * (V_total_L ^ (3 * SuperClass.CubicReductionFactor))
+        -- local ModelMass = BaseMass * (V_total_L ^ (3 * SUPER.CubicReductionFactor))
 
         -- ── 4. Peak torque via BMEP ───────────────────────────
         -- T = BMEP_Pa × V_total_m³ / (4π)    [4-stroke cycle]
@@ -463,10 +480,10 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         -- Apply volumetric efficiency layout bonus/penalty
         local peakTorque = (BMEP_Pa * (V_total_L * 1e-3) / (4 * PI)) * (1 + (LayoutFactors.VEBonus or 0))
 
-        -- ── 5. Redline from mean piston speed ─────────────────
+        -- ── 5. RPM Limit from mean piston speed ─────────────────
         -- RPM_max = 60 × v_piston / (2 × stroke_m)
         -- stroke_m = Stroke_cm × 0.01  →  inline
-        local redlineRPM = floor(60 * PistonSpeed / (2 * Stroke_cm * 0.01))
+        local limitRPM = floor(60 * PistonSpeed / (2 * Stroke_cm * 0.01))
 
         -- ── 6. Idle RPM from bore/stroke ratio + layout ───────
         -- base_idle = 800 × √(bore/stroke)  [dimensionless ratio]
@@ -506,7 +523,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         -- So defaults are provided in their places instead. 
         -- TorqueCurve is no longer hand-made but instead the shape is fully computed.
         local isWankel = Params.Layout == "Wankel"
-        local idleFrac = idleRPM / max(redlineRPM, 1)
+        local idleFrac = idleRPM / max(limitRPM, 1)
         local VECurve = BuildVECurve(
             Params.HeadType        or "ohc",
             Params.CamProfile      or "stock",
@@ -514,11 +531,11 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             --Params.ExhaustType     or "stock",
             Params.FuelDelivery    or "injection",
             Params.IgnitionType,
-            redlineRPM,
+            limitRPM,
             isWankel, idleFrac)
 
         -- ── 11. Torque curve ──────────────────────────────────────────
-        local ct = BuildCurve(VECurve, peakTorque, redlineRPM)
+        local ct = BuildCurve(VECurve, peakTorque, limitRPM, idleRPM, V_total_L)
 
         -- ── 12. Compute model's size according to its displacement ────
         local Scale = 1.08 * pow(V_total_L, 0.30)
@@ -544,7 +561,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             SweptVolPerCyl     = V_swept_cm3 * 0.001,    -- In liters
             Displacement       = {InCubicCentimeters = V_total_cm3, InLiters = V_total_L},
             -- Performance
-            RedlineRPM         = redlineRPM,
+            LimitRPM           = limitRPM,
             IdleRPM            = idleRPM,
             BSFC               = BSFC_eff,
             HeatCoeff          = heatCoeff,
@@ -568,13 +585,14 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             -- Warn: Degrees of tilt before pressure drops
             -- Starve: Degrees of tilt for full starvation
             OilSumpTilt        = {Warn = LayoutFactors.OilSumpTiltWarn or 50, Starve = LayoutFactors.OilSumpTiltStarve or 90},
-            -- Curve
-            TorqueCurve        = {Curve = ct.Curve, Steps = ct.Steps},
+            -- Computed curves
+            Curve              = {Torque = ct.T_Curve, Friction = ct.F_Curve, Steps = ct.Steps},
             VECurve            = VECurve,
             Sample             = ct.Sample,
             PeakPower          = ct.PeakPower,
             PeakTorque         = ct.PeakTorque,
             PowerBand          = ct.PowerBand,
+            RedlineRPM         = ct.RedlineRPM,
             }
         return geometric
     end

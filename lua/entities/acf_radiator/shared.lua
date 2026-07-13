@@ -14,7 +14,12 @@ ACF.Entities.AutoRegisterV2(function()
         OnlyAllowSubtypes = true
     })
     MENU_FIELD("Number", "RadiatorScale", {Min = 0.5, Max = 2.5, Default = 1, Decimals = 1})
-    MENU_FIELD("Number", "CoolantMix", {Min = 0, Max = 1, Default = 0.5, Decimals = 2})
+    MENU_FIELD("Number", "CoolantMix",    {Min = 0, Max = 1, Default = 0.5, Decimals = 2})
+    MENU_FIELD("Number", "Density",       {Min = 0, Max = 99, Default = 1, Decimals = 3})
+    MENU_FIELD("Number", "SpecificHeat",  {Min = 0, Max = 9999, Default = 1, Decimals = 3})
+    MENU_FIELD("Number", "BoilingPoint",  {Min = -273.15, Max = 999, Default = 100, Decimals = 2})
+    MENU_FIELD("Number", "FreezingPoint", {Min = -273.15, Max = 999, Default = 0, Decimals = 2})
+
     MENU_FIELD("Number", "RadiatorSizeX", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
     MENU_FIELD("Number", "RadiatorSizeY", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
     MENU_FIELD("Number", "RadiatorSizeZ", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})

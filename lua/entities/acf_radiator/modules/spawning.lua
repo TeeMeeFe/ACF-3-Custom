@@ -2,6 +2,7 @@ local ACF         = ACF
 local Classes     = ACF.Classes
 local WireLib     = WireLib
 local IsValid     = IsValid
+local Contraption = ACF.Contraption
 local ActiveRadiators = ACF.FuelTanks
 
 local RADIATORTYPE_BASE = "ACF.Radiators.RadiatorType"
@@ -50,7 +51,8 @@ do -- Spawning
     end
 
     function ENT:ACF_PostSpawn(_, _, _, ClientData)
-        self.Temperature = ACF.AmbientTemperature -- In Degrees Kelvin.
+        self.AmbTemp     = ACF.AmbientTemperature - 273.15 -- In Degrees Kelvin to Degrees Celcius.
+        self.Temperature = self.AmbTemp
 
         self:SetScale(self.ACF.Scale)
         -- Radiators should be active by default.
@@ -74,6 +76,8 @@ do -- Updating
             self:ACF_GetUserVar("RadiatorSizeZ")
         )
         local Mixture = self:ACF_GetUserVar("CoolantMix")
+        local Density = self:ACF_GetUserVar("Density")
+        local SpecificHeat = self:ACF_GetUserVar("SpecificHeat")
         local Model   = (RadType and RadType.Model) or "models/radiators/Radiator_small.mdl"
 
         -- Keep the current fuel level proportionally when reconfiguring an existing tank.
@@ -83,32 +87,37 @@ do -- Updating
         self:SetScaledModel(Model)
 
         self.Mixture = Mixture
-        self.Density = RadType.Density
+        self.Density = Density
+        self.SpecificHeat = SpecificHeat
         self.EntType = "Radiator"
         self.Name    = RadType.Name
         self.IsBlock = RadType.IsBlock
 
-        PrintTable({RadType.Density, Mixture, self.Name, Scale})
+        -- PrintTable({RadType.Density, Mixture, Density, SpecificHeat, Scale})
         if RadType.IsBlock then
             self:SetSize(Size)
             local _, Capacity, EmptyMass = self:CalcVolumeAndCapacity(Size)
 
             self.Capacity = Capacity
             self.EmptyMass = EmptyMass
+
         else
             self:SetScale(Scale)
             self.ACF.Scale = Scale
             self.BaseCapacity = RadType.BaseCapacity
             self.BaseEmptyMass = RadType.BaseEmptyMass
 
-            local Capacity, EmptyMass = self:CalcEmptyMassAndCapacity(Scale)
+            local Capacity, Mass = self:CalcMassAndCapacity(Scale)
+            self.EmptyMass = Mass
             self.Capacity = Capacity
-            self.EmptyMass = EmptyMass
+
+            -- PrintTable({self.BaseCapacity, self.BaseEmptyMass, self.EmptyMass, self.Capacity})
         end
 
         self.UnitMass = RadType.Density
         self.Amount = Percentage * self.Capacity
 
+        Contraption.SetMass(self, self.EmptyMass)
         self:UpdateMass(true)
     end
 end
@@ -134,9 +143,10 @@ end
 
 -- The function to calculate empty mass and the capacity of a radiator.
 -- Given that we only scale a model instead of sizing it, it has to be simpler.
-function ENT:CalcEmptyMassAndCapacity(Scale)
+function ENT:CalcMassAndCapacity(Scale)
+    local Density  = self.Density
     local Capacity = self.BaseCapacity * Scale ^ 2.15
-    local BaseMass = self.BaseEmptyMass + (Capacity * 1)
+    local BaseMass = self.BaseEmptyMass + (Capacity * Density)
     return Capacity, BaseMass
 end
 

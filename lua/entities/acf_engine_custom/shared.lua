@@ -26,6 +26,8 @@ ENT.ACF_StaticWireOutputs = {
     "Power (Current power, in kW, output by the engine.)",
     "Fuel Use (Amount of fuel, in liters per minute, being consumed by the engine.)",
     "State (Current state of the engine, whether its off, starting, running or stalling) [STRING]",
+    "Coolant Temp (Current Coolant Temperature of the engine, in degrees Celcius.)",
+    "Oil Temp (Current Oil Temperature of the engine, in degrees Celcius.)",
     "Mass (Total mass detected on the vehicle by the engine.)",
     "Physical Mass (Physical mass detected on the vehicle by the engine.)",
     "Entity (The engine itself.) [ENTITY]",

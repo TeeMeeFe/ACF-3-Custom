@@ -1,32 +1,59 @@
-local ACF = ACF
+local ENTITY = FindMetaTable("Entity")
+local max    = math.max
 
-local ENTITY         = FindMetaTable("Entity")
-local PHYSOBJ		 = FindMetaTable("PhysObj")
+-- Coolant radiator normalisation constant.
+-- Calibrated: 1.0 L 4-cyl NA at idle / 88 °C in thermal equilibrium
+-- with ACF.HeatFractionToCoolant = 0.70 applied to total heat.
+-- K_COOL = ACF.HeatGenerationAtIdle × ACF.HeatFractionToCoolant /
+--          (Q_idle × rho_cool × Cp_cool × (88 - 20))
+-- = 0.105 / (0.18898 × 1.075 × 3600 × 68)  ≈  2.368e-6 / 0.70
+local K_COOL = 7.4358e-6 / ACF.HeatFractionToCoolant
+-- Thermostat constants
+local COOL_THERM_OPEN   = 85   -- Temperature at which the thermostat will begin to open
+local COOL_THERM_THRESH = 2    -- Multiply this by 2 to get the temperature range at which the thermostat remains partly open 
+local COOL_CLOSED_FRAC  = 0.10 -- Fraction of heat taken when the thermostat is fully closed
 
-local IsEntityValid	 = ACF.Optimizations.IsEntityValid
-
-local Clock          = ACF.Utilities.Clock
-local TickInterval   = engine.TickInterval
-
-function ENT:Think()
+function ENT:CalcTemp(InputTemp, InputHeat, InputFlow, DeltaTime)
     local SelfTbl = ENTITY.GetTable(self)
-
-    if not SelfTbl.Active then return end
     if SelfTbl.Disabled then return end
 
-    self:CalcTemp(SelfTbl)
+    local Amount       = SelfTbl.Amount       -- In Liters
+    local Capacity     = SelfTbl.Capacity
+    local Density      = SelfTbl.Density      -- In Grams per Cubic Centimeter or Kilograms per Liter
+    local SpecificHeat = SelfTbl.SpecificHeat -- In Kilojoules per Kilogram
 
-    -- CalcTemp can turn the engine off or disable it (e.g. no fuel or legality issues)
-    if not SelfTbl.Active or SelfTbl.Disabled then return end
+    local AmbTemp      = SelfTbl.AmbTemp
+    local Temperature  = SelfTbl.Temperature
 
-    self:NextThink(CurTime() + TickInterval())
+    local Percentage   = max(Amount / Capacity, 0)
 
-    return true
+    local ThermFrac
+
+    -- Thermostat: smooth 4 °C blend around COOL_THERM_OPEN
+    if Temperature < COOL_THERM_OPEN - COOL_THERM_THRESH then
+        ThermFrac = COOL_CLOSED_FRAC
+    elseif Temperature > COOL_THERM_OPEN + COOL_THERM_THRESH then
+        ThermFrac = 1.0
+    else
+        ThermFrac = COOL_CLOSED_FRAC + (1.0 - COOL_CLOSED_FRAC) * ((Temperature - (COOL_THERM_OPEN - COOL_THERM_THRESH)) * 0.25)
+    end
+
+    local OutputHeat = K_COOL * Amount * (InputHeat * InputFlow) * Density * SpecificHeat * (Temperature - AmbTemp) * Percentage * ThermFrac * DeltaTime
+    SelfTbl.Temperature = max(AmbTemp, InputTemp - OutputHeat)
+
+    PrintTable({AmbTemp, SelfTbl.Temperature, InputTemp, InputHeat, InputFlow, OutputHeat})
+    SelfTbl.UpdateOutputs(self, SelfTbl)
+
+    return OutputHeat
 end
 
-function ENT:CalcTemp(SelfTbl)
-    -- Reusing these entity table pointers helps us cut down on __index calls
-    -- This helps to massively improve performance throughout the entire drivetrain
+-- Wiremod output updating
+function ENT:UpdateOutputs(SelfTbl)
     SelfTbl = SelfTbl or ENTITY.GetTable(self)
+    local Temperature = SelfTbl.Temperature
 
+    if SelfTbl.LastTemperature ~= Temperature then
+        SelfTbl.LastTemperature = Temperature
+        WireLib.TriggerOutput(self, "Temperature", Temperature)
+    end
 end

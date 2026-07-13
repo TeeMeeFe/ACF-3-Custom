@@ -4,7 +4,7 @@ local TankSize    = Vector()
 
 local GetType = Classes.GetTypeByName
 
-ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", function()
+Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", function()
     CLASS.Name                 = "Inline Engine"
     CLASS.Description          = "A piston engine in a inlined configuration"
     CLASS.Model                = "models/engines/inline4s.mdl"
@@ -67,10 +67,10 @@ ACF.Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", f
         local VTotalLabel
 
         -- Variables to fetch any options from our Class Fields
-        local PistonOpts    = ACF.Classes.GetTypeFieldByName(CLASS, "CustomEnginePistons").Options
-        local BoreOpts      = ACF.Classes.GetTypeFieldByName(CLASS, "CustomEngineBore").Options
-        local StrokeOpts    = ACF.Classes.GetTypeFieldByName(CLASS, "CustomEngineStroke").Options
-        local ClearanceOpts = ACF.Classes.GetTypeFieldByName(CLASS, "CustomEngineClearance").Options
+        local PistonOpts    = Classes.GetTypeFieldByName(CLASS, "CustomEnginePistons").Options
+        local BoreOpts      = Classes.GetTypeFieldByName(CLASS, "CustomEngineBore").Options
+        local StrokeOpts    = Classes.GetTypeFieldByName(CLASS, "CustomEngineStroke").Options
+        local ClearanceOpts = Classes.GetTypeFieldByName(CLASS, "CustomEngineClearance").Options
 
         -- Local functions just to update our labels
         local function UpdateCRLabel(Stroke, Clearance)

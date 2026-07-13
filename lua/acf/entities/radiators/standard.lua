@@ -13,13 +13,17 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
     CLASS.BaseCapacity  = 6.5 -- This radiator base capacity at scale 1, In liters.
 
     MENU_FIELD("ACF.Radiators.BaseRadiator", "RadiatorScale", {Min = 0.5, Max = 2.5, Default = 1, Decimals = 1})
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "CoolantMix", {Min = 0, Max = 1, Default = 0.5, Decimals = 2})
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "CoolantMix",    {Min = 0, Max = 1, Default = 0.5, Decimals = 2})
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "Density",       {Min = 0, Max = 99, Default = 1, Decimals = 3})
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "SpecificHeat",  {Min = 0, Max = 9999, Default = 1, Decimals = 3})
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "BoilingPoint",  {Min = -273.15, Max = 999, Default = 100, Decimals = 2})
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "FreezingPoint", {Min = -273.15, Max = 999, Default = 0, Decimals = 2})
 
     -- Private fields, if we had the scaffolding for them..
     -- Specific Caloric Capacity of our fluids, aka how much energy they need to heat up. Higher is better.
-    local WaterCp = 4.186 -- In Joules per gram
-    local GlycolCp = 2.38 -- In Joules per gram
-    -- Densities computed at 20°C, ρ(rho) is the symbol used to compute density in g/cm³.
+    local WaterCp = 4186 -- In Kilojoules per Kilogram
+    local GlycolCp = 2380
+    -- Densities computed at 20°C, ρ(rho) is the symbol used to compute density in g/cm³ or Kg/L.
     local Rho_Water = 0.998
     local Rho_Glycol = 1.113
 
@@ -91,7 +95,7 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
         local MixOpts = Classes.GetTypeFieldByName(CLASS, "CoolantMix").Options
 
         local function UpdateLabels()
-            -- Coolant mix as a ratio of 0 to 1, from full water to full glycerol mixtures
+            -- Coolant mix as a ratio of 0 to 1, from full water to full glycol mixtures
             local CMix = ACF.GetClientData("CoolantMix", MixOpts.Default)
             local MisteryText
             if CMix <= 0 then
@@ -108,18 +112,27 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
             local CoolantCaloricCapacity = WaterCp + (GlycolCp - WaterCp) * CMix
             local CoolantDensity = Rho_Water + (Rho_Glycol - Rho_Water) * CMix
             local CoolantConductivity = lerp(CMix, 0.6, 0.25) -- W/(m·°C)
-            local RadiatorThermalMass = RadiatorCapacity * CoolantCaloricCapacity * CoolantDensity
+            local RadiatorThermalMass = RadiatorCapacity * CoolantCaloricCapacity * CoolantDensity * 0.001
             local BoilingPoint = LookupLerp(BoilingCurve, CMix)
             local FreezingPoint = LookupLerp(FreezingCurve, CMix)
 
             CapacityLabel:SetText(("Capacity: %s Liters"):format(Round(RadiatorCapacity, 1)))
             MixtureLabel:SetText(MisteryText)
+
             CoolCapLabel:SetText(("Specific Heat: %s kJ/kg·°C"):format(Round(CoolantCaloricCapacity, 2)))
+            ACF.SetClientData("SpecificHeat", Round(CoolantCaloricCapacity, 2))
+
             DensityLabel:SetText(("Fluid Density: %s kg/L"):format(Round(CoolantDensity, 2)))
+            ACF.SetClientData("Density", Round(CoolantDensity, 2))
+
             ConductLabel:SetText(("Conductivity:  %s W/m·°C"):format(Round(CoolantConductivity, 2)))
-            TmlMassLabel:SetText(("Total Thermal Mass: %s kJ/°C."):format(Round(RadiatorThermalMass, 2)))
+            TmlMassLabel:SetText(("Total Thermal Mass: %s J/°C."):format(Round(RadiatorThermalMass, 2)))
+
             BoilingLabel:SetText(("Boiling Point: %s °C"):format(Round(BoilingPoint, 2)))
+            ACF.SetClientData("BoilingPoint", Round(BoilingPoint, 2))
+
             FreezingLabel:SetText(("Freezing Point: %s °C"):format(Round(FreezingPoint, 2)))
+            ACF.SetClientData("FreezingPoint", Round(FreezingPoint, 2))
         end
 
         local BasePreview = SubMenu:AddCollapsible("Radiator Info", nil, "icon16/monitor_edit.png")

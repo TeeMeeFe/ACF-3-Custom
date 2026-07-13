@@ -65,6 +65,7 @@ local function UpdateEngine(Entity, Class)
 	Entity.BSFC 				= Compute.BSFC
 	Entity.CompressionRatio 	= Compute.CompressionRatio
 	Entity.Clearance      		= Compute.ClearanceCm
+	Entity.CoolantLevel         = 0
 	Entity.DefaultSound       	= Entity.SoundPath
 	Entity.Displacement 		= Displacement
 	Entity.FiringIrregularity 	= Compute.FiringIrregularity
@@ -78,13 +79,14 @@ local function UpdateEngine(Entity, Class)
 	Entity.IsStalled			= false
 	Entity.Layout				= Compute.Layout
 	Entity.Mass                 = Compute.ScaledMass
-	Entity.RedlineRPM   		= Compute.RedlineRPM
+	Entity.LimitRPM   		    = Compute.LimitRPM
 	Entity.OilSumpTilt  		= Compute.OilSumpTilt
 	Entity.PeakTorque			= Compute.PeakTorque
 	Entity.PeakPower			= Compute.PeakPower
 	Entity.PowerBand			= Compute.PowerBand
 	Entity.Pistons 				= Compute.Pistons
 	Entity.RodRatio				= Compute.RodRatio
+	Entity.RedlineRPM           = Compute.RedlineRPM
 	Entity.RevLimited			= false
 	Entity.SoundPitch         	= Entity.Pitch or 1
 	Entity.SoundVolume        	= Entity.SoundVolume or 1
@@ -95,22 +97,23 @@ local function UpdateEngine(Entity, Class)
 	Entity.Stroke				= Compute.StrokeCm
 	Entity.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	Entity.TorqueSmoothness		= Compute.TorqueSmoothness
-	Entity.TorqueCurve			= Compute.TorqueCurve
+	Entity.TorqueCurve			= Compute.Curve
 	Entity.Torque           	= 0
 	Entity.VECurve		    	= Compute.VECurve
 	Entity.HitBoxes         	= ACF.GetHitboxes(Entity:GetModel())
 	Entity.Out              	= ACF.LocalPlane(Entity:WorldToLocal(Entity:GetAttachment(Entity:LookupAttachment("driveshaft")).Pos), Vector(1, 0, 0))
+	Entity.WasTimed             = false -- Temperature timer shit
 
 	Entity:SetScale(Entity.Scale)
 
 	Contraption.SetMass(Entity, Entity.Mass)
 
-	--PrintTable({Compute})
+	-- PrintTable({Compute})
 	-- Calculate base fuel usage
 	--if Type.CalculateFuelUsage then
 	---	Entity.FuelUse = Type.CalculateFuelUsage(Entity)
 	--else
-		Entity.FuelUse = ACF.FuelRate * Entity.BSFC * 3e-8
+		Entity.FuelUse = ACF.FuelRate * Entity.BSFC -- * 3e-8 -- This forces any engine to consume literal nanoliters lol.
 	--end
 
 	WireLib.TriggerOutput(Entity, "State", "Idle")
@@ -120,10 +123,11 @@ end
 function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	local Engine = Classes.GetTypeByName(ClientData.EngineType)
+	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
 
 	self.ACF 				= {}
 	self.Active        		= false
-	self.AmbientTemp        = ACF.AmbientTemperature
+	self.AmbientTemp        = AmbientTemperature
 	self.Engine             = Engine
 	self.EngineType 		= Classes.GetTypeName(Engine)
 	self.EngineClass   		= ClientData.EngineClass
@@ -132,6 +136,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.FuelTanks     		= {}
 	self.Gearboxes     		= {}
 	self.Radiators     		= {}
+	self.Friction           = 0
 	self.MassRatio     		= 1
 	self.LastThink     		= 0
 	self.LastTorque    		= 0
@@ -150,7 +155,9 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.State         		= "Idle"
 	self.SoundBanks    		= {}
 	self.RevLimiterEnabled 	= true
-	self.Temperature   		= {Coolant = self.AmbientTemp, Oil = self.AmbientTemp}
+	self.LastCoolantTemp    = AmbientTemperature
+	self.LastOilTemp        = AmbientTemperature
+	self.Temperature   		= {Coolant = AmbientTemperature, Oil = AmbientTemperature}
 	self.WaterPumpFlow		= 0
 	self.Pistons 	   		= ClientData.CustomEnginePistons
 	self.Bore          		= ClientData.CustomEngineBore
@@ -315,4 +322,5 @@ function ENT:OnRemove(IsFullUpdate)
 	end
 
 	TimerRemove("ACF Engine Clock " .. self:EntIndex())
+	TimerRemove("ACF Temperature Clock " .. self:EntIndex())
 end

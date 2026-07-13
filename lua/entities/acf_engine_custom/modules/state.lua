@@ -186,12 +186,24 @@ do -- Actual engine rpm and torque calculations
     function ENT:Think()
         local SelfTbl = ENTITY.GetTable(self)
 
-        self:CalcTemp(SelfTbl)
-        if not SelfTbl.Active then return end
+        -- Keep updating temps even if the radiator is off
+        if not SelfTbl.Active then
+            if not SelfTbl.WasTimed then
+                TimerCreate("ACF Temperature Clock " .. self:EntIndex(), 1, 0, function()
+                    self:CalcTemp(SelfTbl)
+                    SelfTbl.LastThink = Clock.CurTime
+                    SelfTbl.UpdateOutputs(self, SelfTbl)
+                end)
+                SelfTbl.WasTimed = true
+            end
+            return
+        end
         if SelfTbl.Disabled then return end
 
         self:CalcRPM(SelfTbl)
+        self:CalcTemp(SelfTbl)
 
+        SelfTbl.LastThink = Clock.CurTime
         -- CalcRPM can turn the engine off or disable it (e.g. no fuel or legality issues)
         if not SelfTbl.Active or SelfTbl.Disabled then return end
 
@@ -212,15 +224,16 @@ do -- Actual engine rpm and torque calculations
         local DeltaTime  = ClockTime - SelfTbl.LastThink
         local FuelTank   = GetNextFuelTank(SelfTbl)
         local IsElectric = SelfTbl.IsElectric
-        local LimitRPM   = SelfTbl.RedlineRPM
+        local LimitRPM   = SelfTbl.LimitRPM
+        local RedlineRPM = SelfTbl.RedlineRPM
         local FlyRPM     = SelfTbl.FlyRPM
 
         -- Determine if the rev limiter will engage or disengage
         local RevLimited = false
-        if SelfTbl.revLimiterEnabled and not IsElectric then
-            if FlyRPM > LimitRPM * 0.99 then
+        if SelfTbl.RevLimiterEnabled and not IsElectric then
+            if FlyRPM > RedlineRPM * 0.99 then
                 RevLimited = true
-            elseif FlyRPM < LimitRPM * 0.95 then
+            elseif FlyRPM < RedlineRPM * 0.95 then
                 RevLimited = false
             end
 
@@ -246,13 +259,13 @@ do -- Actual engine rpm and torque calculations
         end
 
         -- Calculate the current torque from flywheel RPM
+        local Torque, Friction = 0, SelfTbl.Friction or 0
+
         local IdleRPM    = SelfTbl.IdleRPM
         local PeakRPM    = IsElectric and SelfTbl.FlywheelOverride or SelfTbl.PowerBand.Max
         local Inertia    = SelfTbl.FlywheelInertia
         local PeakTorque = SelfTbl.PeakTorque.InNm
-        local Drag       = PeakTorque * (max(FlyRPM - IdleRPM, 0) / PeakRPM) * (1 - Throttle) / Inertia
-
-        local Torque = 0
+        local Drag       = (PeakTorque * (max(FlyRPM - IdleRPM, 0) / PeakRPM) * (1 - Throttle)) / Inertia
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
@@ -263,14 +276,17 @@ do -- Actual engine rpm and torque calculations
             SelfTbl.State = "Active"
         end
 
-        if Throttle ~= 0 and FlyRPM < LimitRPM then
-            -- local Percent = Remap(FlyRPM, IdleRPM, LimitRPM, 0, 1)
-            Torque = Throttle * SelfTbl.Sample(FlyRPM) -- * (FlyRPM < LimitRPM and 1 or 0)
+        -- if Throttle ~= 0 and FlyRPM < LimitRPM then
+        if FlyRPM < LimitRPM then
+            local Sample = SelfTbl.Sample(FlyRPM)
+            Torque = Throttle * Sample[1]
+            Friction = Sample[2]
         end
 
         SelfTbl.Torque = Torque
+        SelfTbl.Friction = Friction -- Assembly Friction
 
-        -- Let's accelerate the flywheel based on that torque
+        -- Let's accelerate the flywheel based on that torque, up to the engine's mechanical limit.
         FlyRPM = min(max(FlyRPM + Torque / Inertia - Drag, 0), LimitRPM)
 
         -- The gearboxes don't think on their own, it's the engine that calls them, to ensure consistent execution order
@@ -326,7 +342,6 @@ do -- Actual engine rpm and torque calculations
             SelfTbl.IsStalled = true
             SetActive(self, false, SelfTbl)
         end
-        SelfTbl.LastThink = ClockTime
 
         SelfTbl.UpdateSound(self, SelfTbl)
         SelfTbl.UpdateOutputs(self, SelfTbl)
@@ -366,6 +381,7 @@ function ENT:UpdateOutputs(SelfTbl)
     local FlyRPM    = SelfTbl.FlyRPM
     local Power     = Round(Torque * FlyRPM / 9548.8)
     local State     = SelfTbl.State
+    local Temps     = SelfTbl.Temperature
 
     Torque = Round(Torque)
     FlyRPM = Round(FlyRPM)
@@ -389,6 +405,14 @@ function ENT:UpdateOutputs(SelfTbl)
     if SelfTbl.LastState ~= State then
         SelfTbl.LastState = State
         WireLib.TriggerOutput(self, "State", State)
+    end
+    if SelfTbl.LastCoolantTemp ~= Temps.Coolant then
+        SelfTbl.LastCoolantTemp = Temps.Coolant
+        WireLib.TriggerOutput(self, "Coolant Temp", Temps.Coolant)
+    end
+    if SelfTbl.LastOilTemp ~= Temps.Oil then
+        SelfTbl.LastOilTemp = Temps.Oil
+        WireLib.TriggerOutput(self, "Oil Temp", Temps.Oil)
     end
 end
 
