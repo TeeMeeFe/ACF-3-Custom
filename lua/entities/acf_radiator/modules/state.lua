@@ -13,6 +13,13 @@ local COOL_THERM_OPEN   = 85   -- Temperature at which the thermostat will begin
 local COOL_THERM_THRESH = 2    -- Multiply this by 2 to get the temperature range at which the thermostat remains partly open 
 local COOL_CLOSED_FRAC  = 0.10 -- Fraction of heat taken when the thermostat is fully closed
 
+function ENT:SetActive(Active)
+    self.Active = Active
+    self:UpdateOverlay()
+
+    WireLib.TriggerOutput(self, "Activated", self.Active and 1 or 0)
+end
+
 function ENT:CalcTemp(InputTemp, InputHeat, InputFlow, DeltaTime)
     local SelfTbl = ENTITY.GetTable(self)
     if SelfTbl.Disabled then return end
@@ -38,10 +45,13 @@ function ENT:CalcTemp(InputTemp, InputHeat, InputFlow, DeltaTime)
         ThermFrac = COOL_CLOSED_FRAC + (1.0 - COOL_CLOSED_FRAC) * ((Temperature - (COOL_THERM_OPEN - COOL_THERM_THRESH)) * 0.25)
     end
 
-    local OutputHeat = K_COOL * Amount * (InputHeat * InputFlow) * Density * SpecificHeat * (Temperature - AmbTemp) * Percentage * ThermFrac * DeltaTime
-    SelfTbl.Temperature = max(AmbTemp, InputTemp - OutputHeat)
+    local IdleHO = K_COOL * DeltaTime * Capacity * 100 * ACF.HeatGenerationScalar
 
-    PrintTable({AmbTemp, SelfTbl.Temperature, InputTemp, InputHeat, InputFlow, OutputHeat})
+    local OutputHeat = max(IdleHO, K_COOL * Amount * (InputHeat * InputFlow) *
+                                    Density * SpecificHeat * (Temperature - AmbTemp) *
+                                    Percentage * ThermFrac * DeltaTime)
+
+    SelfTbl.Temperature = max(AmbTemp, InputTemp - OutputHeat)
     SelfTbl.UpdateOutputs(self, SelfTbl)
 
     return OutputHeat
@@ -50,8 +60,14 @@ end
 -- Wiremod output updating
 function ENT:UpdateOutputs(SelfTbl)
     SelfTbl = SelfTbl or ENTITY.GetTable(self)
-    local Temperature = SelfTbl.Temperature
 
+    local Temperature = SelfTbl.Temperature
+    local Active = SelfTbl.Active
+
+    if SelfTbl.LastActive ~= Active then
+        SelfTbl.LastActive = Active
+        WireLib.TriggerOutput(self, "Activated", Active)
+    end
     if SelfTbl.LastTemperature ~= Temperature then
         SelfTbl.LastTemperature = Temperature
         WireLib.TriggerOutput(self, "Temperature", Temperature)

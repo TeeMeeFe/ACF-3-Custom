@@ -35,10 +35,12 @@ do -- Spawning
 
     function ENT:ACF_OnSpawn()
         self.Active          = false
+        self.ThermEnabled    = false
         self.Engine          = nil
         self.Mixture         = 0
         self.MisteryText     = ""
         self.IsLeaking       = false
+        self.LastActive      = false
         self.LeakingRate     = 0
         self.LastThink       = 0
         self.LastTemperature = 0
@@ -55,9 +57,6 @@ do -- Spawning
         self.Temperature = self.AmbTemp
 
         self:SetScale(self.ACF.Scale)
-        -- Radiators should be active by default.
-        self:TriggerInput("Active", 1)
-        self.Active = true
         WireLib.TriggerOutput(self, "Entity", self)
         WireLib.TriggerOutput(self, "Temperature", self.Temperature)
     end
@@ -93,7 +92,6 @@ do -- Updating
         self.Name    = RadType.Name
         self.IsBlock = RadType.IsBlock
 
-        -- PrintTable({RadType.Density, Mixture, Density, SpecificHeat, Scale})
         if RadType.IsBlock then
             self:SetSize(Size)
             local _, Capacity, EmptyMass = self:CalcVolumeAndCapacity(Size)
@@ -110,24 +108,31 @@ do -- Updating
             local Capacity, Mass = self:CalcMassAndCapacity(Scale)
             self.EmptyMass = Mass
             self.Capacity = Capacity
-
-            -- PrintTable({self.BaseCapacity, self.BaseEmptyMass, self.EmptyMass, self.Capacity})
         end
 
         self.UnitMass = RadType.Density
         self.Amount = Percentage * self.Capacity
+
+        WireLib.TriggerOutput(self, "Amount", self.Amount)
+        WireLib.TriggerOutput(self, "Capacity", self.Capacity)
 
         Contraption.SetMass(self, self.EmptyMass)
         self:UpdateMass(true)
     end
 end
 
--- Wire input handler for Active
-ACF.AddInputAction("acf_radiator", "Active", function(Entity, Value)
-    Entity.Active = tobool(Value)
+do -- Wiremod input handlers
+    -- Active
+    ACF.AddInputAction("acf_radiator", "Active", function(Entity, Value)
+        Entity.Active = tobool(Value)
 
-    WireLib.TriggerOutput(Entity, "Activated", Entity.Active and 1 or 0)
-end)
+        WireLib.TriggerOutput(Entity, "Activated", Entity.Active and 1 or 0)
+    end)
+    -- Thermostat, does nothing at the moment
+    ACF.AddInputAction("acf_radiator", "Thermostat", function(Entity, Value)
+        Entity.ThermEnabled = tobool(Value)
+    end)
+end
 
 -- Remove-only teardown. Captured by AutoRegisterV2 as OrigOnRemove; the generated OnRemove still
 -- runs ACF_OnEntityLast + WireLib cleanup around this.

@@ -28,8 +28,6 @@ function ENT:ACF_UpdateOverlayState(State)
         State:AddKeyValue("Scale", self.ACF.Scale)
     end
     State:AddKeyValue("Fluid Type", MisteryText)
-    -- Unit conversion on the temperature, from Degrees Kelvin to Celcius
-    State:AddKeyValue("Temperature", ("%s°C"):format(self.Temperature))
 
     local CoolantAmount   = Round(self.Amount, 2)
     local CoolantCapacity = Round(self.Capacity, 2)

@@ -71,7 +71,7 @@ do -- State Handling
                     local Amount          = EntTable.Amount
                     local Capacity        = EntTable.Capacity
 
-                    local CoolantLevel    = (Capacity and Amount) and (Amount / Capacity) or 1
+                    local CoolantLevel    = Amount / Capacity
                     local CoolantLevelMin = 0.15 -- Coolant level threshold
 
                     -- Water pump flow. Cavitates if coolant level is critically low
@@ -79,6 +79,9 @@ do -- State Handling
                     SelfTbl.WaterPumpFlow = Q
 
                     HOCool = Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime)
+                    Ent:SetActive(SelfTbl.Active) -- Set the radiator to whatever state this entity is in
+                else
+                    HOCool = Ent:CalcTemp(CT, 0, 0, DeltaTime)
                 end
             end
         end
