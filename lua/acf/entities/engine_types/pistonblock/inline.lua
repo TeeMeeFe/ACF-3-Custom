@@ -16,6 +16,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
     local __INLINE_BAL = { [2] = 0.72, [3] = 0.78, [4] = 0.84, [5] = 0.88, [6] = 0.96, [7] = 0.98, [8] = 1.00 }
     local __INLINE_IDL = { [2] = 1.08, [3] = 1.05, [4] = 1.00, [5] = 0.97, [6] = 0.92, [7] = 0.90, [8] = 0.88 }
 
+    FIELD("String", "CustomEngineModel",     {Default = "models/engines/inline4s.mdl"})
     FIELD("Number", "CustomEnginePistons",   {Min = 2,    Max = 6,  Default = 4,   Decimals = 0})
     FIELD("Number", "CustomEngineBore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
     FIELD("Number", "CustomEngineStroke",    {Min = 1,    Max = 20, Default = 4.2, Decimals = 2}) -- in Centimeters
@@ -59,7 +60,6 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
     function CLASS.CreateMenu(SubMenu, NestedData, PushData)
         local ToString = tostring
         local Round = math.Round
-        local Floor = math.floor
         local PI = math.pi
 
         local CRLabel
@@ -67,26 +67,22 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         local VTotalLabel
 
         -- Variables to fetch any options from our Class Fields
+        local ModelOpts     = Classes.GetTypeFieldByName(CLASS, "CustomEngineModel").Options
         local PistonOpts    = Classes.GetTypeFieldByName(CLASS, "CustomEnginePistons").Options
         local BoreOpts      = Classes.GetTypeFieldByName(CLASS, "CustomEngineBore").Options
         local StrokeOpts    = Classes.GetTypeFieldByName(CLASS, "CustomEngineStroke").Options
         local ClearanceOpts = Classes.GetTypeFieldByName(CLASS, "CustomEngineClearance").Options
 
         -- Local functions just to update our labels
-        local function UpdateCRLabel(Stroke, Clearance)
-            local __Stroke = Stroke or ACF.GetClientNumber("CustomEngineStroke", StrokeOpts.Default)
-            local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
-
-            local String = ToString(Round(1 + __Stroke / __Clearance, 2))
-
-            CRLabel:SetText("Compression Ratio: " .. String)
+        local function UpdatePreview(Panel, Data)
+            Panel:UpdateModel(Data)
         end
 
-        -- Volume Swept-Displacement Panels
-        local function UpdateVSDLabels(Pistons, Bore, Stroke)
-            local __Pistons = Floor(Pistons or ACF.GetClientNumber("CustomEnginePistons", PistonOpts.Default))
-            local __Bore    = Bore or ACF.GetClientNumber("CustomEngineBore", BoreOpts.Default)
-            local __Stroke  = Stroke or ACF.GetClientNumber("CustomEngineStroke", StrokeOpts.Default)
+        local function UpdateEngineStats(Pistons, Bore, Stroke, Clearance)
+            local __Pistons   = Round(Pistons or ACF.GetClientNumber("CustomEnginePistons", PistonOpts.Default))
+            local __Bore      = Bore or ACF.GetClientNumber("CustomEngineBore", BoreOpts.Default)
+            local __Stroke    = Stroke or ACF.GetClientNumber("CustomEngineStroke", StrokeOpts.Default)
+            local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
 
             -- ── Swept volume and displacement ──────────────────
             -- V_swept (cm³) = π/4 × bore² × stroke
@@ -94,27 +90,42 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
             -- The values above are also rounded to the nearest 2 decimals
             local V_swept = ToString(Round((PI / 4) * __Bore * __Bore * __Stroke, 2))
             local V_displ = ToString(Round(V_swept * __Pistons * 0.001, 2))
+            local CRatio  = ToString(Round(1 + __Stroke / __Clearance, 2))
 
-            VSweptLabel:SetText("Swept Volume (cm³): " .. V_swept)
+            CRLabel:SetText("Compression Ratio: " .. CRatio)
+            VSweptLabel:SetText("Swept Volume per piston (cm³): " .. V_swept)
             VTotalLabel:SetText("Displacement (L): " .. V_displ)
         end
 
-        local EngineName = SubMenu:AddTitle()
-        local EngineDesc = SubMenu:AddLabel()
+        local EngineBase = SubMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
+        local EngineName = EngineBase:AddTitle()
+        local EngineDesc = EngineBase:AddLabel()
+
         EngineName:SetText(CLASS.Name)
         EngineDesc:SetText(CLASS.Description)
 
+        local EnginePreview = EngineBase:AddModelPreview(nil, true, "Primary")
+        CRLabel     = EngineBase:AddLabel()
+        VSweptLabel = EngineBase:AddLabel()
+        VTotalLabel = EngineBase:AddLabel()
+
+        UpdateEngineStats()
+        UpdatePreview(EnginePreview, ModelOpts.Default)
+
         local EngineConfig = SubMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
-        VSweptLabel = SubMenu:AddLabel("")
-        VTotalLabel = SubMenu:AddLabel("")
-        UpdateVSDLabels()
 
         local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
         Pistons:SetValue(ACF.GetClientNumber("CustomEnginePistons", NestedData.CustomEnginePistons or PistonOpts.Default))
         Pistons:SetClientData("CustomEnginePistons", "OnValueChanged")
         Pistons:DefineSetter(function(Panel, _, _, Value)
             Panel:SetValue(Round(Value, PistonOpts.Decimals or 0))
-            UpdateVSDLabels(Value)
+
+            -- Set the engine's preview model too
+            NestedData.CustomEngineModel = ("models/engines/inline%ss.mdl"):format(Round(Value, PistonOpts.Decimals or 0) or ModelOpts.Default)
+            ACF.SetClientData("CustomEngineModel", NestedData.CustomEngineModel)
+
+            UpdatePreview(EnginePreview, NestedData.CustomEngineModel)
+            UpdateEngineStats(Value)
             PushData()
         end)
 
@@ -123,7 +134,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         Bore:SetClientData("CustomEngineBore", "OnValueChanged")
         Bore:DefineSetter(function(Panel, _, _, Value)
             Panel:SetValue(Round(Value, BoreOpts.Decimals or 2))
-            UpdateVSDLabels(nil, Value)
+            UpdateEngineStats(nil, Value)
             PushData()
         end)
 
@@ -136,7 +147,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         Clearance:SetClientData("CustomEngineClearance", "OnValueChanged")
         Clearance:DefineSetter(function(Panel, _, _, Value)
             Panel:SetValue(Round(Value, ClearanceOpts.Decimals or 2))
-            UpdateCRLabel(nil, Value)
+            UpdateEngineStats(nil, nil, nil, Value)
             PushData()
         end)
 
@@ -146,13 +157,9 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
 
             local ClearVal = Clearance:GetValue()
             if ClearVal >= Value then Clearance:SetValue(Value - 0.01) end
-            UpdateCRLabel(Value, nil)
-            UpdateVSDLabels(nil, nil, Value)
+            UpdateEngineStats(nil, nil, Value, nil)
             PushData()
         end)
-
-        CRLabel = EngineConfig:AddLabel("Compression Ratio: " .. ToString(Round(1 + NestedData.CustomEngineStroke / NestedData.CustomEngineClearance, 2)))
-        UpdateCRLabel()
 
         -- Fuel config labels and stuff 
         local FuelConfig = SubMenu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")
@@ -166,7 +173,6 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         --=========================================================================--
         -- RIGHT BELOW THIS CODE IS STRAIGHT UP COPIED FROM engines.lua MENU CODE  --
         --=========================================================================--
-
         -- Shape selector. The combo value is the ContainerShapes class FQN written straight into the
         -- "Shape" field; no string->class translation needed at spawn time.
         local FuelShape = FuelConfig:AddComboBox()

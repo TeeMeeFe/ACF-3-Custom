@@ -11,7 +11,7 @@ local IsEntityValid = ACF.Optimizations.IsEntityValid
 local function UpdateEngine(Entity, Class)
 	Entity.ACF = Entity.ACF or {}
 
-	local Model = Class.Model
+	local Model = Entity.Model
 	Entity:SetScaledModel(Model)
 
 	local Params = {
@@ -159,6 +159,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.LastOilTemp        = AmbientTemperature
 	self.Temperature   		= {Coolant = AmbientTemperature, Oil = AmbientTemperature}
 	self.WaterPumpFlow		= 0
+	self.Model              = ClientData.CustomEngineModel
 	self.Pistons 	   		= ClientData.CustomEnginePistons
 	self.Bore          		= ClientData.CustomEngineBore
 	self.Stroke        		= ClientData.CustomEngineStroke
