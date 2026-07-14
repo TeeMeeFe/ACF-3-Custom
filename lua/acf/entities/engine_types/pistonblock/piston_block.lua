@@ -131,18 +131,12 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         local t_curve = {}
         local f_curve = {}
 
-        local peakKW          = 0
+        local peakPowerKW     = 0
+        local peakTorqueIdx   = 0
         local peakPowerAtRPM  = 0
         local peakTorqueAtRPM = 0
 
-        local powerbandMin = 0
-        local powerbandMax = 0
-
-        local rpmStep = maxRPM / steps
-
-        local redlineRPM = 0
-
-        -- Compute the curve and define peaks 
+        -- First pass, compute the curve and define peaks 
         for i = 0, steps do
             local pos   = (i / steps) * (n - 1)
             local idx0  = floor(pos)
@@ -153,39 +147,49 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             t_curve[i]  = peakTorque * (v0 + blend * (v1 - v0)) -- torque curve
             f_curve[i]  = FRICTION_K_FRIC * (t_curve[i] ^ FRICTION_RPM_EXP) * dispL -- friction curve
 
-            local torque = t_curve[i]
-            local rpm    = rpmStep * i
+            -- Get the i-th points
+            local rpm_i    = maxRPM * i / steps
+            local torque_i = t_curve[i]
+            local power_i  = torque_i * (rpm_i * TWO_PI_OVER_60) * 0.001
 
-            -- Get peak torque at RPM (We already know peakTorque)
-            if torque >= peakTorque then
-                peakTorqueAtRPM = rpm
+            -- Get peak torque and at RPM
+            if torque_i >= peakTorque then
+                peakTorqueAtRPM = rpm_i
+                peakTorqueIdx   = i
             end
-
-            local power = torque * (rpm * TWO_PI_OVER_60) * 0.001
 
             -- Get peak power and at RPM
-            if power > peakKW then
-                peakKW         = power
-                peakPowerAtRPM = rpm
-            end
-
-            local threshold = peakKW * POWER_BAND_THRESHOLD
-
-            -- Get the RPM's that make our powerband according to a threshold
-            if power < threshold then
-                powerbandMax = rpm
-            elseif power >= threshold then
-                powerbandMin = rpm
-            end
-
-            local torqueThreshold = peakTorque * REDLINE_TORQUE_FRAC
-
-            if torque >= torqueThreshold then
-                redlineRPM = maxRPM * i / steps
+            if power_i > peakPowerKW then
+                peakPowerKW    = power_i
+                peakPowerAtRPM = rpm_i
             end
         end
 
-        local function Sample(rpm)
+         -- Second pass, find the redline RPM (not maxRPM as that's the mechanical limit, this one is set before that so it doesn't explode)
+        local threshold    = peakPowerKW * POWER_BAND_THRESHOLD
+
+        local powerbandMin = peakPowerAtRPM
+        local powerbandMax = peakPowerAtRPM
+
+        local doRedline    = REDLINE_TORQUE_FRAC and REDLINE_TORQUE_FRAC < 1.0
+        local torqueThresh = peakTorque * REDLINE_TORQUE_FRAC
+        local redlineRPM   = 0
+
+        for i = 0, steps do
+            local rpm_i   = maxRPM * i / steps
+            local power_i = t_curve[i] * (rpm_i * TWO_PI_OVER_60) / 1000
+
+            if power_i >= threshold then
+                if rpm_i < powerbandMin then powerbandMin = rpm_i end
+                if rpm_i > powerbandMax then powerbandMax = rpm_i end
+            end
+
+            if doRedline and i >= peakTorqueIdx and t_curve[i] >= torqueThresh then
+                redlineRPM = rpm_i
+            end
+        end
+
+        local function sample(rpm)
             rpm         = clamp(rpm, 0, maxRPM)
             local frac  = (rpm / maxRPM) * steps
             local idx0  = floor(frac)
@@ -202,8 +206,8 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             T_Curve    = t_curve,
             F_Curve    = f_curve,
             Steps      = steps,
-            Sample     = Sample,
-            PeakPower  = {InKW = peakKW, InHP = peakKW * KWTOHP, AtRPM = peakPowerAtRPM},
+            Sample     = sample,
+            PeakPower  = {InKW = peakPowerKW, InHP = peakPowerKW * KWTOHP, AtRPM = peakPowerAtRPM},
             PeakTorque = {InNm = peakTorque, InFtLb = peakTorque * NMTOFTLB, AtRPM = peakTorqueAtRPM},
             PowerBand  = {Band = abs(powerbandMax - powerbandMin), Min = powerbandMin, Max = powerbandMax},
             RedlineRPM = redlineRPM
