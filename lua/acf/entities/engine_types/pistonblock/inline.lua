@@ -58,13 +58,10 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
     end
 
     function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-        local ToString = tostring
         local Round = math.Round
         local PI = math.pi
 
-        local CRLabel
-        local VSweptLabel
-        local VTotalLabel
+        local EngineDescLabel
 
         -- Variables to fetch any options from our Class Fields
         local ModelOpts     = Classes.GetTypeFieldByName(CLASS, "CustomEngineModel").Options
@@ -88,13 +85,15 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
             -- V_swept (cm³) = π/4 × bore² × stroke
             -- V_displ (L)   = V_swept × pistons × 0.001
             -- The values above are also rounded to the nearest 2 decimals
-            local V_swept = ToString(Round((PI / 4) * __Bore * __Bore * __Stroke, 2))
-            local V_displ = ToString(Round(V_swept * __Pistons * 0.001, 2))
-            local CRatio  = ToString(Round(1 + __Stroke / __Clearance, 2))
+            local V_swept = Round((PI / 4) * __Bore * __Bore * __Stroke, 2)
+            local V_displ = Round(V_swept * __Pistons * 0.001, 2)
+            local CRatio  = Round(1 + __Stroke / __Clearance, 2)
 
-            CRLabel:SetText("Compression Ratio: " .. CRatio)
-            VSweptLabel:SetText("Swept Volume per piston (cm³): " .. V_swept)
-            VTotalLabel:SetText("Displacement (L): " .. V_displ)
+            local Label = ("Compression Ratio: %s:1\
+                            \nSwept Volume per piston: %s cm³\
+                            \nDisplacement: %s L"):format(CRatio, V_swept, V_displ)
+
+            EngineDescLabel:SetText(Label)
         end
 
         local EngineBase = SubMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
@@ -105,9 +104,9 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         EngineDesc:SetText(CLASS.Description)
 
         local EnginePreview = EngineBase:AddModelPreview(nil, true, "Primary")
-        CRLabel     = EngineBase:AddLabel()
-        VSweptLabel = EngineBase:AddLabel()
-        VTotalLabel = EngineBase:AddLabel()
+        local EngineStats = EngineBase:AddTitle()
+        EngineStats:SetText("Engine Stats")
+        EngineDescLabel = EngineBase:AddLabel()
 
         UpdateEngineStats()
         UpdatePreview(EnginePreview, ModelOpts.Default)
