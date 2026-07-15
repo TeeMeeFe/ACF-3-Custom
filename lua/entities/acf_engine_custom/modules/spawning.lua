@@ -5,50 +5,44 @@ local TimerRemove   = timer.Remove
 local Contraption   = ACF.Contraption
 local IsEntityValid = ACF.Optimizations.IsEntityValid
 
--- Engines should have these states: IDLE, STARTING, ACTIVE, STALLING
--- Old engines had ACTIVE, IDLE. 
-
 local function UpdateEngine(Entity, Class)
 	Entity.ACF = Entity.ACF or {}
 
-	local Model = Entity.Model
+	local Model = Entity.Model or Class.CustomEngineModel
 	Entity:SetScaledModel(Model)
 
 	local Params = {
-		Pistons   = Entity.Pistons,
-		Bore	  = Entity.Bore,
-		Stroke 	  = Entity.Stroke,
-		Clearance = Entity.Clearance
+		Pistons   = Entity.Pistons or Class.CustomEnginePistons,
+		Bore	  = Entity.Bore or Class.CustomEngineBore,
+		Stroke 	  = Entity.Stroke or Class.CustomEngineStroke,
+		Clearance = Entity.Clearance or Class.CustomEngineClearance
 	}
 
-	local TypeFields = Classes.GetTypeByName(Entity.EngineClass)
-	local EngineClass = Entity.EngineClass
+	local EngineClass = Entity.Engine.Class
 	local FuelTypes = {}
 	local ExtraEngineFields = {}
-
-	--PrintTable({EngineClass, TypeFields})
 	-- Shitty hack to get the type of fuel used for these engine Classes
 	-- This is the same hack used for the menu creation in piston_block/inline.lua
 	if EngineClass == "ACF.EngineTypes.GenericPetrol" then
 		FuelTypes = {["ACF.FuelTypes.Petrol"] = true}
 		ExtraEngineFields = {
 			PistonSpeed  = 20, -- m/s
-			Efficiency   = TypeFields.Efficiency,
-			TorqueScale  = TypeFields.TorqueScale,
+			Efficiency   = 0.304, -- TypeFields.Efficiency
+			TorqueScale  = 0.25, -- TypeFields.TorqueScale
 			IgnitionType = "spark"
 		}
 	elseif EngineClass == "ACF.EngineTypes.GenericDiesel" then
 		FuelTypes = {["ACF.FuelTypes.Diesel"] = true}
 		ExtraEngineFields = {
 			PistonSpeed  = 13, -- m/s
-			Efficiency   = TypeFields.Efficiency,
-			TorqueScale  = TypeFields.TorqueScale,
+			Efficiency   = 0.243, -- TypeFields.Efficiency
+			TorqueScale  = 0.35, -- TypeFields.TorqueScale
 			IgnitionType = "glow"
 		}
 	end
 
-	local LayoutFactors = Class.GetLayoutFactors(Entity.Pistons)
-	local Compute = Class.Compute(Sel, LayoutFactors, Params, ExtraEngineFields)
+	local LayoutFactors = Class.GetLayoutFactors(Params.Pistons)
+	local Compute = Class.Compute(_, LayoutFactors, Params, ExtraEngineFields)
 
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
@@ -74,7 +68,7 @@ local function UpdateEngine(Entity, Class)
 	Entity.FuelTypes          	= FuelTypes or { ["ACF.FuelTypes.Petrol"] = true }
 	Entity.FuelType           	= next(FuelTypes)
 	Entity.HeatCoefficient		= Compute.HeatCoeff
-	Entity.HealthMult			= TypeFields.HealthMult
+	Entity.HealthMult			= 0.3
 	Entity.IdleRPM				= Compute.IdleRPM
 	Entity.IsStalled			= false
 	Entity.Layout				= Compute.Layout
@@ -122,15 +116,18 @@ end
 
 function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
-	local Engine = Classes.GetTypeByName(ClientData.EngineType)
+	-- These shouldn't exist here, but the class menu stuff isn't finished yet, so we cope with this instead.
+	local Engine = ClientData.EngineType
+	local EngineClass = ClientData.EngineClass
 	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
+
+	Engine.Class = EngineClass -- Doesn't save for duplicator
 
 	self.ACF 				= {}
 	self.Active        		= false
 	self.AmbientTemp        = AmbientTemperature
-	self.Engine             = Engine
-	self.EngineType 		= Classes.GetTypeName(Engine)
-	self.EngineClass   		= ClientData.EngineClass
+	self.Engine          	= Engine
+	self.EngineFieldData   	= Classes.GetTypeByName(EngineType)
 	self.ExhaustEntity 		= nil
 	self.FuelTypes			= {}
 	self.FuelTanks     		= {}
@@ -159,6 +156,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.LastOilTemp        = AmbientTemperature
 	self.Temperature   		= {Coolant = AmbientTemperature, Oil = AmbientTemperature}
 	self.WaterPumpFlow		= 0
+	-- Cope, cry and seethe 
 	self.Model              = ClientData.CustomEngineModel
 	self.Pistons 	   		= ClientData.CustomEnginePistons
 	self.Bore          		= ClientData.CustomEngineBore
@@ -187,7 +185,7 @@ function ENT:ACF_OnUpdateEntityData()
 end
 
 function ENT:ACF_PostUpdateEntityData()
-	UpdateEngine(self, self.Engine) -- ENT:GetBlockType doesn't work
+	UpdateEngine(self, self:GetEngineType())
 
 	-- A reconfigure can invalidate existing links (no-op on a fresh spawn).
 	if next(self.Gearboxes) then
