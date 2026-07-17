@@ -16,11 +16,14 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
     local __INLINE_BAL = { [2] = 0.72, [3] = 0.78, [4] = 0.84, [5] = 0.88, [6] = 0.96, [7] = 0.98, [8] = 1.00 }
     local __INLINE_IDL = { [2] = 1.08, [3] = 1.05, [4] = 1.00, [5] = 0.97, [6] = 0.92, [7] = 0.90, [8] = 0.88 }
 
-    FIELD("String", "CustomEngineModel",     {Default = "models/engines/inline4s.mdl"})
-    FIELD("Number", "CustomEnginePistons",   {Min = 2,    Max = 6,  Default = 4,   Decimals = 0})
-    FIELD("Number", "CustomEngineBore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
-    FIELD("Number", "CustomEngineStroke",    {Min = 1,    Max = 20, Default = 4.2, Decimals = 2}) -- in Centimeters
-    FIELD("Number", "CustomEngineClearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("String", "CustomEngineModel",     {Default = "models/engines/inline4s.mdl"})
+    MENU_FIELD("Number", "CustomEnginePistons",   {Min = 2,    Max = 6,  Default = 4,   Decimals = 0})
+    MENU_FIELD("Number", "CustomEngineBore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "CustomEngineStroke",    {Min = 1,    Max = 20, Default = 4.2, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "CustomEngineClearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
+
+    MENU_FIELD("String", "CustomEngineCylinderHead", {Default = "Pushrod"})
+    MENU_FIELD("String", "CustomEngineCamshaftType", {Default = "Stock"})
 
     function CLASS.GetLayoutFactors(Pistons)
         if not Pistons then return end
@@ -43,13 +46,15 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         local BASE = BASE
         local Args = unpack({...}) -- Unpack any extra args and store them here
 
-        -- Append the layout and sign fields
+        -- Append the layout, sign fields and the rest of the args
         Params.Layout       = CLASS.Layout
         Params.Sign         = CLASS.Sign
         Params.Efficiency   = Args.Efficiency
         Params.IgnitionType = Args.IgnitionType
         Params.PistonSpeed  = Args.PistonSpeed
         Params.TorqueScale  = Args.TorqueScale
+        -- Params.HeadShape    = ACF.GetClientData("CustomEngineCylinderHead", Classes.GetTypeFieldByName(CLASS, "CustomEngineCylinderHead").Options.Default)
+        -- Params.Cam_mod      = ACF.GetClientData("CustomEngineCamshaftType", Classes.GetTypeFieldByName(CLASS, "CustomEngineCamshaftType").Options.Default)
 
         -- The base class has the implementation of this method, so we redict this info there instead
         local Computed = BASE.Compute(CLASS, Layout, Params)
@@ -59,6 +64,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
 
     function CLASS.CreateMenu(SubMenu, NestedData, PushData)
         local Round = math.Round
+        local Clamp = math.Clamp
         local PI = math.pi
 
         local EngineDescLabel
@@ -69,6 +75,35 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         local BoreOpts      = Classes.GetTypeFieldByName(CLASS, "CustomEngineBore").Options
         local StrokeOpts    = Classes.GetTypeFieldByName(CLASS, "CustomEngineStroke").Options
         local ClearanceOpts = Classes.GetTypeFieldByName(CLASS, "CustomEngineClearance").Options
+
+        -- Same CR_BOUNDS as the one computed for piston_block, just that we can't get that info from the server(yet)
+        -- So we cope by hardcoding(copying) the same values over again...
+        local CR_BOUNDS = {
+            diesel = { min = 16.0, max = 22.0 },   -- diesel: compression-ignition requirement
+            petrol = { min = 7.0,  max = 13.0 },   -- petrol/other: knock-limited range
+        }
+
+        -- Clamps a raw compression ratio (derived from stroke/clearance) into the realistic range (provided above)
+        -- for the given fuel type, and back-corrects clearance to match if clamping changed it.
+        local function ClampCR(Stroke, Clearance)
+            local __Stroke = Stroke or ACF.GetClientData("CustomEngineStroke", StrokeOpts.Default)
+            local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
+            local EngineType = ACF.GetClientData("EngineClass", "ACF.EngineTypes.GenericPetrol")
+            local FuelType = EngineType == "ACF.EngineTypes.GenericPetrol" and "petrol" or "diesel"
+
+            local CorrectedClearance = __Clearance
+            local Bounds = CR_BOUNDS[FuelType] or CR_BOUNDS.petrol
+
+            local CR_raw = 1 + __Stroke / __Clearance
+            local CR     = Clamp(CR_raw, Bounds.min, Bounds.max)
+            if CR ~= CR_raw then CorrectedClearance = __Stroke / (CR - 1) end
+
+            -- Get the clamped limits
+            local Min = __Stroke / (Bounds.min - 1)
+            local Max = __Stroke / (Bounds.max - 1)
+
+            return CorrectedClearance, Min, Max
+        end
 
         -- Local functions just to update our labels
         local function UpdatePreview(Panel, Data)
@@ -96,6 +131,37 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
             EngineDescLabel:SetText(Label)
         end
 
+        --[[
+        -- Ass, but should suffice for now
+        local function UpdateCylHeadHelperText(Panel, Data, Index)
+            local Text
+            if Data == "Pushrod" or Index == 1 then
+                Text = "Pushrods are good for low-end torque, are sturdier but heavier and as result, they have slower piston speed."
+            elseif Data == "SOHC" or Index == 2 then
+                Text = "Single Overhead Camshafts are good for high-end torque and are lightweight, but suffer from increased wear."
+            elseif Data == "DOHC" or Index == 3 then
+                Text = "Double Overhead Camshafts allow to tune the torque curve towards a lower/higher ends. They are costly to manufacture."
+            end
+
+            Panel:SetText(Text)
+        end
+
+        local function UpdateCamshaftHelperText(Panel, Data, Index)
+            local Text
+            if Data == "Stock" or Index == 1 then
+                Text = "Just the stock camshaft, neutral in cost and torque curve shift."
+            elseif Data == "Economy" or Index == 2 then
+                Text = "Cheaper stock camshaft, as a result the curve is shifted towards the lower end."
+            elseif Data == "Sport" or Index == 3 then
+                Text = "Sports camshaft, made to shift the torque curve up ever so slightly."
+            elseif Data == "Race" or Index == 4 then
+                Text = "Race camshaft, shifts towards very high-end torque but suffers from narrow powerband."
+            end
+
+            Panel:SetText(Text)
+        end
+        ]]--
+
         local EngineBase = SubMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
         local EngineName = EngineBase:AddTitle()
         local EngineDesc = EngineBase:AddLabel()
@@ -109,7 +175,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         EngineDescLabel = EngineBase:AddLabel()
 
         UpdateEngineStats()
-        UpdatePreview(EnginePreview, ModelOpts.Default)
+        UpdatePreview(EnginePreview, ACF.GetClientData("CustomEngineModel", ModelOpts.Default))
 
         local EngineConfig = SubMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
 
@@ -145,20 +211,59 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         Clearance:SetValue(ACF.GetClientNumber("CustomEngineClearance", NestedData.CustomEngineClearance or ClearanceOpts.Default))
         Clearance:SetClientData("CustomEngineClearance", "OnValueChanged")
         Clearance:DefineSetter(function(Panel, _, _, Value)
-            Panel:SetValue(Round(Value, ClearanceOpts.Decimals or 2))
+            local CorrectedCR = ClampCR(Stroke:GetValue(), Value)
+
+            Panel:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
             UpdateEngineStats(nil, nil, nil, Value)
             PushData()
         end)
 
         Stroke:DefineSetter(function(Panel, _, _, Value)
             Panel:SetValue(Round(Value, StrokeOpts.Decimals or 2))
-            Clearance:SetMax(Value - 0.01)
 
-            local ClearVal = Clearance:GetValue()
-            if ClearVal >= Value then Clearance:SetValue(Value - 0.01) end
+            local _, CRMin, CRMax = ClampCR(Value, Clearance:GetValue())
+            Clearance:SetMinMax(CRMax, CRMin)
+
             UpdateEngineStats(nil, nil, Value, nil)
             PushData()
         end)
+
+        --[[
+        local CylHeadConfig = SubMenu:AddCollapsible("Cylinder Head Configuration", nil, "icon16/shape_square_edit.png")
+        -- Ideally these would be their own Class, but this should suffice for now
+        local CylHeadType = CylHeadConfig:AddComboBox()
+        CylHeadType:AddChoice("Pushrod / On Head Valve (OHV)", "Pushrod")
+        CylHeadType:AddChoice("Single Overhead Camshaft (SOHC)", "SOHC")
+        CylHeadType:AddChoice("Double Overhead Camshaft (DOHC)", "DOHC")
+        CylHeadType:ChooseOptionID(ACF.GetClientData("CylHeadID", 1))
+
+        local CylHeadHelp = CylHeadConfig:AddLabel()
+
+        UpdateCylHeadHelperText(CylHeadHelp, nil, ACF.GetClientData("CylHeadID", 1))
+        function CylHeadType:OnSelect(Index, _, Data)
+            ACF.SetClientData("CylHeadID", Index) -- This is just for the looks while we set data elsewhere
+            ACF.SetClientData("CustomEngineCylinderHead", Data)
+
+            UpdateCylHeadHelperText(CylHeadHelp, Data)
+        end
+
+        local CamshaftType = CylHeadConfig:AddComboBox()
+        CamshaftType:AddChoice("Stock", "Stock")
+        CamshaftType:AddChoice("Economy", "Economy")
+        CamshaftType:AddChoice("Sport", "Sport")
+        CamshaftType:AddChoice("Race", "Race")
+        CamshaftType:ChooseOptionID(ACF.GetClientData("CamshaftID", 1))
+
+        local CamshaftHelp = CylHeadConfig:AddLabel()
+
+        UpdateCamshaftHelperText(CamshaftHelp, nil, ACF.GetClientData("CamshaftID", 1))
+        function CamshaftType:OnSelect(Index, _, Data)
+            ACF.SetClientData("CamshaftID", Index)
+            ACF.SetClientData("CustomEngineCamshaftType", Data)
+
+            UpdateCamshaftHelperText(CamshaftHelp, Data)
+        end
+        ]]--
 
         -- Fuel config labels and stuff 
         local FuelConfig = SubMenu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")
@@ -206,7 +311,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         local SizeX = FuelConfig:AddSlider("#acf.menu.fuel.tank_length", Min, Max)
         SizeX:SetClientData("FuelSizeX", "OnValueChanged")
         SizeX:DefineSetter(function(Panel, _, _, Value)
-            local X = math.Round(Value)
+            local X = Round(Value)
 
             Panel:SetValue(X)
 
@@ -225,7 +330,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         local SizeY = FuelConfig:AddSlider("#acf.menu.fuel.tank_width", Min, Max)
         SizeY:SetClientData("FuelSizeY", "OnValueChanged")
         SizeY:DefineSetter(function(Panel, _, _, Value)
-            local Y = math.Round(Value)
+            local Y = Round(Value)
 
             Panel:SetValue(Y)
 
@@ -244,7 +349,7 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         local SizeZ = FuelConfig:AddSlider("#acf.menu.fuel.tank_height", Min, Max)
         SizeZ:SetClientData("FuelSizeZ", "OnValueChanged")
         SizeZ:DefineSetter(function(Panel, _, _, Value)
-            local Z = math.Round(Value)
+            local Z = Round(Value)
 
             Panel:SetValue(Z)
 
@@ -279,7 +384,6 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
         function EngineClass:OnSelect(_, _, Data)
             if self.Selected == Data then return end
 
-            --self.ListData.Index = Index
             self.Selected = Data
 
             local FuelData
@@ -296,6 +400,10 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
 
             ACF.SetClientData("EngineClass", Data)
             ACF.LoadSortedList(FuelType, Fuel, "ID")
+
+            -- Call to clamp the panel whenever we change fuel types
+            local _, CRMin, CRMax = ClampCR()
+            Clearance:SetMinMax(CRMax, CRMin)
         end
 
         function FuelType:OnSelect(Index, _, Data)
@@ -304,7 +412,6 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
             self.ListData.Index = Index
             self.Selected = Data
 
-            --PrintTable({self.ListData.Index, self.Selected, Classes.GetTypeName(Data)})
             ACF.SetClientData("FuelType", Classes.GetTypeName(Data))
 
             self:UpdateFuelText()
@@ -330,8 +437,8 @@ Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", funct
                 FuelText = FuelText .. TextFunc(Capacity, Mass, EmptyMass)
             else
                 local Text = language.GetPhrase("acf.menu.fuel.tank_stats")
-                local Liters = math.Round(Capacity, 2)
-                local Gallons = math.Round(Capacity * ACF.LToGal, 2)
+                local Liters = Round(Capacity, 2)
+                local Gallons = Round(Capacity * ACF.LToGal, 2)
 
                 FuelText = FuelText .. Text:format(ACF.ContainerArmor, Liters, Gallons, ACF.GetProperMass(Mass), ACF.GetProperMass(EmptyMass))
             end

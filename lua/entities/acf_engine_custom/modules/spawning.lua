@@ -36,7 +36,7 @@ local function UpdateEngine(Entity, Class)
 		ExtraEngineFields = {
 			PistonSpeed  = 13, -- m/s
 			Efficiency   = 0.243, -- TypeFields.Efficiency
-			TorqueScale  = 0.35, -- TypeFields.TorqueScale
+			TorqueScale  = 0.25, -- TypeFields.TorqueScale
 			IgnitionType = "glow"
 		}
 	end

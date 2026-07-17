@@ -39,26 +39,6 @@ local sqrt    = math.sqrt
 --    BankAngle   number  degrees between banks (V, WR)
 --    BankCount   number  number of banks (WR only; V is always 2)
 --
---  ── Geo table shape (identical for all engine types) ──────────────────────
---
---  All Compute() methods must return a geo table with these keys so that
---  Combustion.lua and all downstream modules are layout-agnostic:
---
---    -- Geometry identity
---    Layout, BankAngle, BankCount, IsPiston, IsWankel, IsTurbine, IsElectric
---    -- Input parameters (stored for HUD / GetStatus)
---    BoreCm, StrokeCm, ClearanceCm, Pistons
---    -- Derived geometry (piston only; nil for non-piston)
---    CompressionRatio, SweptVolPerCyl, Displacement
---    -- Performance (all types)
---    PeakTorque, RedlineRPM, IdleRPM
---    BSFC, HeatCoeff, FlywheelInertia
---    TorqueSmoothness, BalanceFactor, FiringIrregularity
---    -- Torque curve (all types)
---    maxTorque, maxRPM, steps, curve
---    -- Sample method (closure over curve)
---    Sample(rpm) → Nm
---
 -- ===========================================================================
 
 ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", function()
@@ -96,6 +76,20 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         "SingleMonoEngine",
         "ParallelTwinEngine"
     })
+
+    -- ── Compression ratio bounds, keyed by ignition type ───────
+    -- Diesel's range is a hard physical requirement (compression
+    -- ignition needs enough heat from compression alone to self-ignite,
+    -- which only happens in a narrow high-CR band); petrol's range is
+    -- knock-limited (RON/octane) and much wider, but still bounded.
+    local CR_BOUNDS = {
+        glow  = { min = 16.0, max = 22.0 },   -- diesel: compression-ignition requirement
+        spark = { min = 7.0,  max = 13.0 },   -- petrol/other: knock-limited range
+    }
+    local CR_BOUNDS_DEFAULT = CR_BOUNDS.spark
+
+    -- Reference CR for the thermodynamic torque-scaling multiplier below
+    local CR_TORQUE_REF = 9.0
 
     -- ──────────────────────────────────────────────────────────
     --  Torque curve builder (shared by all layouts)
@@ -301,6 +295,9 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         local CARB_PENALTY        = 0.07   -- VE fraction lost at redline (carburetor only)
         local RUNNER_REF_CM       = 22.0   -- Default intake runner reference in centimeters
         local RUNNER_SHIFT_K      = 0.0025 -- RPM-fraction shift per cm of runner length difference
+        local CR_REF_PETROL       = 9.0    -- matches CR petrol reference
+        local CR_REF_DIESEL       = 18.0   -- typical modern turbodiesel CR
+        local CR_RISE_SHIFT_K     = 0.0075 -- RPM-fraction shift per CR-unit of deviation
 
         --- Two-segment idle-anchored rise.  Guarantees ve(idleFrac) == VE_IDLE_FRACTION
         --- exactly, regardless of how far away rise_end sits — a single smoothstep
@@ -326,7 +323,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
 
         --- Computes a normalised volumetric-efficiency curve (0–1 values, peak = 1)
         --- from physical valve-train, intake, exhaust, and fuel-delivery parameters.
-        --- Replaces the hand-authored TorqueCurve array on TypeDef.
+        --- Replaces the hand-authored TorqueCurve array that was before.
         ---
         --- Physical contributions (all additive on top of the base VE shape):
         ---   HeadType      → base plateau position and rolloff steepness
@@ -338,7 +335,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         ---   isWankel      → replaces valve-train shape with Wankel port-timing model
         ---
         --- Returns a flat array of VE_SAMPLES normalised values evenly spaced 0→redline.
-        local function BuildVECurve(headType, camProfile, runnerLen_cm, fuelDelivery, ignType, redlineRPM, isWankel, idleFrac)
+        local function BuildVECurve(headType, camProfile, runnerLen_cm, fuelDelivery, ignType, redlineRPM, isWankel, idleFrac, CR)
 
             idleFrac = clamp(idleFrac or 0, 0, 0.35)
 
@@ -381,7 +378,13 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             -- idle sits close enough to it that the guaranteed sharp post-idle
             -- window would overrun it. In that case the sharp window wins so the
             -- rise never inverts (this only matters for unusually high-idle layouts).
-            local rise_end = math.max(base.rise_end + hmod.rise_shift, idleFrac + VE_RISE_SHARP_WIDTH)
+            -- CR shift: higher-than-reference CR pulls rise_end earlier (faster
+            -- climb to full torque); lower-than-reference CR pushes it later.
+            local cr_ref   = (ignType == "glow") and CR_REF_DIESEL or CR_REF_PETROL
+            local cr_shift = -CR_RISE_SHIFT_K * ((CR or cr_ref) - cr_ref)
+            local rise_end = math.max(
+                base.rise_end + hmod.rise_shift + cr_shift,
+                idleFrac + VE_RISE_SHARP_WIDTH)
 
             local base_fall_width = base.fall_end - base.fall_start
             local fall_start      = base.fall_start + hmod.fall_shift + cam.shift + runner_shift
@@ -450,7 +453,11 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         Clearance_cm = clamp(Clearance_cm, 0.05, Stroke_cm - 0.01)
 
         -- ── 1. Compression ratio (dimensionless — cm cancel) ──
-        local CR = 1 + Stroke_cm / Clearance_cm
+        -- Clamped to a realistic range for the engine's ignition type.
+        local crBounds = CR_BOUNDS[Params.IgnitionType] or CR_BOUNDS_DEFAULT
+        local CR_raw   = 1 + Stroke_cm / Clearance_cm
+        local CR       = clamp(CR_raw, crBounds.min, crBounds.max)
+        if CR ~= CR_raw then Clearance_cm = Stroke_cm / (CR - 1) end
 
         -- ── 2. Swept volume and displacement 
         -- V_swept (cm³) = π/4 × bore² × stroke
@@ -471,18 +478,21 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
 
         local ModelMass = PistonsMass + RodsMass + CrankMass + BlockMass + HeadMass
 
-        -- local ModelMass = BaseMass * (V_total_L ^ (3 * SUPER.CubicReductionFactor))
+        -- Otto cycle thermal efficiency scaled by Compression Ratio effects.
+        -- η_otto = 1 − (1/CR)^(γ-1)
+        local eta_otto = 1 - (1 / CR) ^ (CLASS.Gamma - 1)
 
-        -- ── 4. Peak torque via BMEP ───────────────────────────
+        -- ── 4. Peak torque via BMEP, scaled by CR's thermodynamic effect  ──────
+        -- Higher CR extracts more mechanical work from the same combustion event 
+        -- The multiplier is normalized against CR_TORQUE_REF (9.0) so TorqueScale
+        -- keeps meaning "BMEP potential at CR 9". CR only scales output up
+        -- or down from that baseline, it doesn't add a second independenttorque knob.
+        local eta_otto_ref   = 1 - (1 / CR_TORQUE_REF) ^ (CLASS.Gamma - 1)
+        local CR_torque_mult = eta_otto / eta_otto_ref
         -- T = BMEP_Pa × V_total_m³ / (4π)    [4-stroke cycle]
-        local BMEP_Pa    = Params.TorqueScale * CLASS.BMEP_Scale * 1e5
-        -- Wankel rotary: each rotor provides WANKEL_POWER_STROKES combustion
-        -- events per shaft revolution instead of the 0.5 of a 4-stroke piston.
-        -- BMEP formula stays the same (it's per-displacement), but we apply
-        -- the firing-frequency bonus to effective peak torque via VEBonus.
-        -- The key difference is captured in BSFCMult and IdleRPMMult.
-        -- Apply volumetric efficiency layout bonus/penalty
-        local peakTorque = (BMEP_Pa * (V_total_L * 1e-3) / (4 * PI)) * (1 + (LayoutFactors.VEBonus or 0))
+        local BMEP_Pa        = Params.TorqueScale * CLASS.BMEP_Scale * 1e5
+        -- Calculate peak torque, scale by CR and apply volumetric efficiency layout bonus/penalty
+        local peakTorque = ((BMEP_Pa * (V_total_L * 1e-3) / (4 * PI)) * CR_torque_mult) * (1 + (LayoutFactors.VEBonus or 0))
 
         -- ── 5. RPM Limit from mean piston speed ─────────────────
         -- RPM_max = 60 × v_piston / (2 × stroke_m)
@@ -503,7 +513,6 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         -- BSFC   = 1 / (η_real × CLASS.LHV_KWH)          [kg/kWh, theoretical]
         -- Corrected by type ratio and layout BSFC multiplier:
         -- BSFC_eff = BSFC_theoretical × (typeBSFC / REF_BSFC) × BSFCMult
-        local eta_otto  = 1 - (1 / CR) ^ (CLASS.Gamma  - 1)
         local BSFC_base = 1 / (CLASS.ETA_FRIC * eta_otto * CLASS.LHV_KWH)
         local typeCorr  = (Params.Efficiency or CLASS.REF_BSFC) / CLASS.REF_BSFC
         local BSFC_eff  = BSFC_base * typeCorr * (LayoutFactors.BSFCMult or 1.0)
@@ -536,7 +545,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             Params.FuelDelivery    or "injection",
             Params.IgnitionType,
             limitRPM,
-            isWankel, idleFrac)
+            isWankel, idleFrac, CR)
 
         -- ── 11. Torque curve ──────────────────────────────────────────
         local ct = BuildCurve(VECurve, peakTorque, limitRPM, idleRPM, V_total_L)
