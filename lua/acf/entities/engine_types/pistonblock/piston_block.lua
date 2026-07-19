@@ -1,8 +1,10 @@
 local ACF     = ACF
+local Classes = ACF.Classes
 local istable = istable
 local PI      = math.pi
 local abs     = math.abs
-local clamp   = math.Clamp
+local Clamp   = math.Clamp
+local Round   = math.Round
 local floor   = math.floor
 local exp     = math.exp
 local min     = math.min
@@ -41,7 +43,7 @@ local sqrt    = math.sqrt
 --
 -- ===========================================================================
 
-ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", function()
+Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", function()
     CLASS.Name          = "Piston Block Class"
     CLASS.Description   = "The base class for any and all piston engines."
     CLASS.ToolDesc      = "Attempts to spawn the selected piston engine."
@@ -67,9 +69,9 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
     --CLASS.WANKEL_POWER_STROKES = 3  -- TODO: This shouldn't be here IMHO
 
     MENU_FIELD("ACF.Engines.PistonBlock", "EngineType", {
-        "InlineEngine",
+        "ACF.Engines.InlineEngine",
         "BoxerEngine",
-        "VTypeEngine",
+        "ACF.Engines.VTypeEngine",
         "WRTypeEngine",
         "RotaryEngine",
         "RadialEngine",
@@ -184,7 +186,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         end
 
         local function sample(rpm)
-            rpm         = clamp(rpm, 0, maxRPM)
+            rpm         = Clamp(rpm, 0, maxRPM)
             local frac  = (rpm / maxRPM) * steps
             local idx0  = floor(frac)
             local idx1  = min(idx0 + 1, steps)
@@ -216,7 +218,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
 
         --- Cubic smoothstep: 0 at edge0, 1 at edge1, smooth S-curve between.
         local function smoothstep(edge0, edge1, x)
-            local t = clamp((x - edge0) / (edge1 - edge0 + 1e-9), 0, 1)
+            local t = Clamp((x - edge0) / (edge1 - edge0 + 1e-9), 0, 1)
             return t * t * (3 - 2 * t)
         end
 
@@ -337,7 +339,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         --- Returns a flat array of VE_SAMPLES normalised values evenly spaced 0→redline.
         local function BuildVECurve(headType, camProfile, runnerLen_cm, fuelDelivery, ignType, redlineRPM, isWankel, idleFrac, CR)
 
-            idleFrac = clamp(idleFrac or 0, 0, 0.35)
+            idleFrac = Clamp(idleFrac or 0, 0, 0.35)
 
             -- ── Wankel port-timing model (overrides valve-train entirely) ──
             if isWankel then
@@ -353,7 +355,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
                     -- Resonance bonus at ~65% redline (short runner)
                     local dr = (t - 0.65) / 0.16
                     ve = ve * (1 + 0.05 * exp(-0.5 * dr * dr))
-                    pts[i] = clamp(ve, 0, 1)
+                    pts[i] = Clamp(ve, 0, 1)
                 end
                 -- Normalise
                 local peak = 0
@@ -390,7 +392,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             local fall_start      = base.fall_start + hmod.fall_shift + cam.shift + runner_shift
             local fall_width      = base_fall_width / hmod.fall_k / cam.fall_k
             local fall_end        = fall_start + fall_width
-            -- Safety clamp: fall can never begin before the rise has finished,
+            -- Safety Clamp: fall can never begin before the rise has finished,
             -- which would otherwise invert the curve for extreme head/cam/runner combos.
             if fall_start <= rise_end then
                 fall_start = rise_end + 0.05
@@ -400,7 +402,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
             local resonance_frac = 0.55   -- fallback if no runner data
             if runnerLen_cm and runnerLen_cm > 0 then
                 local res_rpm    = (V_SOUND / (4 * runnerLen_cm * 0.01)) * 60
-                resonance_frac   = clamp(res_rpm / redlineRPM, 0.1, 1.2)
+                resonance_frac   = Clamp(res_rpm / redlineRPM, 0.1, 1.2)
             end
 
             -- ── Sample the curve ───────────────────────────────────
@@ -431,7 +433,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
                     ve = ve * (1 - pen)
                 end
 
-                pts[i] = clamp(ve, 0, 1)
+                pts[i] = Clamp(ve, 0, 1)
             end
 
             -- Normalise so peak = 1.0 (peak torque is set by BMEP, not by this array)
@@ -450,13 +452,13 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         local PistonSpeed  = Params.PistonSpeed or CLASS.DEFAULT_PISTON_SPEED
 
         -- Validate clearance — must be positive and less than stroke
-        Clearance_cm = clamp(Clearance_cm, 0.05, Stroke_cm - 0.01)
+        Clearance_cm = Clamp(Clearance_cm, 0.05, Stroke_cm - 0.01)
 
         -- ── 1. Compression ratio (dimensionless — cm cancel) ──
         -- Clamped to a realistic range for the engine's ignition type.
         local crBounds = CR_BOUNDS[Params.IgnitionType] or CR_BOUNDS_DEFAULT
         local CR_raw   = 1 + Stroke_cm / Clearance_cm
-        local CR       = clamp(CR_raw, crBounds.min, crBounds.max)
+        local CR       = Clamp(CR_raw, crBounds.min, crBounds.max)
         if CR ~= CR_raw then Clearance_cm = Stroke_cm / (CR - 1) end
 
         -- ── 2. Swept volume and displacement 
@@ -505,7 +507,7 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         -- IdleRPMMult: layout-specific adjustment (Wankel idles higher; boxer lower)
         local base_idle = 800 * sqrt(Bore_cm / Stroke_cm)
         local bal_idle  = base_idle / max(LayoutFactors.BalanceFactor, 0.5)
-        local idleRPM   = clamp(floor(bal_idle * (LayoutFactors.IdleRPMMult or 1.0)), 300, 2200)
+        local idleRPM   = Clamp(floor(bal_idle * (LayoutFactors.IdleRPMMult or 1.0)), 300, 2200)
 
         -- ── 7. BSFC from Otto efficiency + CR + type ──────────
         -- η_otto = 1 − (1/CR)^(γ-1)
@@ -610,20 +612,342 @@ ACF.Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock"
         return geometric
     end
 
-    function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-        local TypeSelector = ACF.Classes.CreateTypeSelector(SubMenu, CLASS, "EngineType")
-        local ClassList    = TypeSelector.ComboBox
+    --====================================================================================--
+    -- MENU CODE  
+    --====================================================================================--
+    -- I would have done this in a separate utility file named menues_cl.lua, however 
+    -- several issues arised with this methodology that prevented me from doing so, not
+    -- that i'm done with that idea but the fact that hot-updates don't quite work 
+    -- (i am forced to retry in console everytime i need to make or test a change) threw 
+    -- me off of that way. So instead menus will have to be done within the file/class that
+    -- defines them.
 
-        if ClassList and ClassList.Selected then
-            local TypeName = ACF.Classes.GetTypeName(ClassList.Selected)
-            ACF.SetClientData("EngineType", TypeName)
+    do
+        local GetType = Classes.GetTypeByName
+        local TankSize = Vector()
+
+        function CLASS.CreateMenu(SubMenu, NestedData, PushData)
+            local TypeSelector = Classes.CreateTypeSelector(SubMenu, CLASS, "EngineType")
+            local ClassList    = TypeSelector.ComboBox
+
+            if ClassList and ClassList.Selected then
+                local TypeName = Classes.GetTypeName(ClassList.Selected)
+
+                ACF.SetClientData("EngineType", TypeName)
+                ACF.SetClientData("EngineClassData", ClassList.Selected)
+            end
+
+            local EngineDescLabel
+            local SUPER = ACF.GetClientData("EngineClassData") -- TODO: Add default option here
+
+            -- Variables to fetch any options from our Class Fields
+            local ModelOpts     = Classes.GetTypeFieldByName(SUPER, "CustomEngineModel").Options
+            local PistonOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEnginePistons").Options
+            local BoreOpts      = Classes.GetTypeFieldByName(SUPER, "CustomEngineBore").Options
+            local StrokeOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEngineStroke").Options
+            local ClearanceOpts = Classes.GetTypeFieldByName(SUPER, "CustomEngineClearance").Options
+
+            -- Clamps a raw compression ratio (derived from stroke/clearance) into the realistic range
+            -- for the given fuel type, and back-corrects clearance to match if clamping changed it.
+            local function ClampCR(Stroke, Clearance)
+                local __Stroke = Stroke or ACF.GetClientData("CustomEngineStroke", StrokeOpts.Default)
+                local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
+                local EngineType = ACF.GetClientData("EngineClass", "ACF.EngineTypes.GenericPetrol")
+                local FuelType = EngineType == "ACF.EngineTypes.GenericPetrol" and "spark" or "glow"
+
+                local CorrectedClearance = __Clearance
+                local Bounds = CR_BOUNDS[FuelType] or CR_BOUNDS_DEFAULT
+
+                local CR_raw = 1 + __Stroke / __Clearance
+                local CR     = Clamp(CR_raw, Bounds.min, Bounds.max)
+                if CR ~= CR_raw then CorrectedClearance = __Stroke / (CR - 1) end
+
+                -- Get the clamped limits
+                local Min = __Stroke / (Bounds.min - 1)
+                local Max = __Stroke / (Bounds.max - 1)
+
+                return CorrectedClearance, Min, Max
+            end
+
+            -- Local functions just to update our labels
+            local function UpdatePreview(Panel, Data)
+                Panel:UpdateModel(Data)
+            end
+
+            local function UpdateEngineStats(Pistons, Bore, Stroke, Clearance)
+                local __Pistons   = Round(Pistons or ACF.GetClientNumber("CustomEnginePistons", PistonOpts.Default))
+                local __Bore      = Bore or ACF.GetClientNumber("CustomEngineBore", BoreOpts.Default)
+                local __Stroke    = Stroke or ACF.GetClientNumber("CustomEngineStroke", StrokeOpts.Default)
+                local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
+
+                -- ── Swept volume and displacement ──────────────────
+                -- V_swept (cm³) = π/4 × bore² × stroke
+                -- V_displ (L)   = V_swept × pistons × 0.001
+                -- The values above are also rounded to the nearest 2 decimals
+                local V_swept = Round((PI / 4) * __Bore * __Bore * __Stroke, 2)
+                local V_displ = Round(V_swept * __Pistons * 0.001, 2)
+                local CRatio  = Round(1 + __Stroke / __Clearance, 2)
+
+                local Label = ("Compression Ratio: %s:1\
+                                \nSwept Volume per piston: %s cm³\
+                                \nDisplacement: %s L"):format(CRatio, V_swept, V_displ)
+
+                EngineDescLabel:SetText(Label)
+            end
+
+            local EngineBase = SubMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
+            local EngineName = EngineBase:AddTitle()
+            local EngineDesc = EngineBase:AddLabel()
+
+            EngineName:SetText(CLASS.Name)
+            EngineDesc:SetText(CLASS.Description)
+
+            local EnginePreview = EngineBase:AddModelPreview(nil, true, "Primary")
+            local EngineStats = EngineBase:AddTitle()
+            EngineStats:SetText("Engine Stats")
+            EngineDescLabel = EngineBase:AddLabel()
+
+            UpdateEngineStats()
+            UpdatePreview(EnginePreview, ACF.GetClientData("CustomEngineModel", ModelOpts.Default))
+
+            local EngineConfig = SubMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
+
+            local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
+            Pistons:SetValue(ACF.GetClientNumber("CustomEnginePistons", NestedData.CustomEnginePistons or PistonOpts.Default))
+            Pistons:SetClientData("CustomEnginePistons", "OnValueChanged")
+            Pistons:DefineSetter(function(Panel, _, _, Value)
+                Panel:SetValue(Round(Value, PistonOpts.Decimals or 0))
+
+                -- Set the engine's preview model too
+                NestedData.CustomEngineModel = ("models/engines/inline%ss.mdl"):format(Round(Value, PistonOpts.Decimals or 0) or ModelOpts.Default)
+                ACF.SetClientData("CustomEngineModel", NestedData.CustomEngineModel)
+
+                UpdatePreview(EnginePreview, NestedData.CustomEngineModel)
+                UpdateEngineStats(Value)
+                PushData()
+            end)
+
+            local Bore = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
+            Bore:SetValue(ACF.GetClientNumber("CustomEngineBore", NestedData.CustomEngineBore or BoreOpts.Default))
+            Bore:SetClientData("CustomEngineBore", "OnValueChanged")
+            Bore:DefineSetter(function(Panel, _, _, Value)
+                Panel:SetValue(Round(Value, BoreOpts.Decimals or 2))
+                UpdateEngineStats(nil, Value)
+                PushData()
+            end)
+
+            local Stroke = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
+            Stroke:SetValue(ACF.GetClientNumber("CustomEngineStroke", NestedData.CustomEngineStroke or StrokeOpts.Default))
+            Stroke:SetClientData("CustomEngineStroke", "OnValueChanged")
+
+            local Clearance = EngineConfig:AddSlider("Piston TDC Clearance (cm)", ClearanceOpts.Min, ClearanceOpts.Max, ClearanceOpts.Decimals)
+            Clearance:SetValue(ACF.GetClientNumber("CustomEngineClearance", NestedData.CustomEngineClearance or ClearanceOpts.Default))
+            Clearance:SetClientData("CustomEngineClearance", "OnValueChanged")
+            Clearance:DefineSetter(function(Panel, _, _, Value)
+                local CorrectedCR = ClampCR(Stroke:GetValue(), Value)
+
+                Panel:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
+                UpdateEngineStats(nil, nil, nil, Value)
+                PushData()
+            end)
+
+            Stroke:DefineSetter(function(Panel, _, _, Value)
+                Panel:SetValue(Round(Value, StrokeOpts.Decimals or 2))
+
+                local _, CRMin, CRMax = ClampCR(Value, Clearance:GetValue())
+                Clearance:SetMinMax(CRMax, CRMin)
+
+                UpdateEngineStats(nil, nil, Value, nil)
+                PushData()
+            end)
+
+            ACF.SetClientData("PrimaryClass", "acf_engine_custom")
+            ACF.SetClientData("SecondaryClass", "acf_fueltank")
+            ACF.SetClientData("FuelTank", "Scalable") -- Set default fuel tank to scalable
+
+            ACF.SetToolMode("acf_menu", "Spawner", "Engine") -- Just in case
+
+            -- Fuel config labels and stuff 
+            local FuelConfig = SubMenu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")
+            local EngineClass = FuelConfig:AddComboBox()
+            EngineClass:AddChoice("Diesel Engine", "ACF.EngineTypes.GenericDiesel")
+            EngineClass:AddChoice("Petrol Engine", "ACF.EngineTypes.GenericPetrol")
+            EngineClass:SetValue("Petrol Engine") -- Filthy fucking hack, i hate this
+            timer.Simple(0, function() if IsValid(EngineClass) then EngineClass:OnSelect(nil, nil, "ACF.EngineTypes.GenericPetrol") end end) -- smh
+
+            local FuelType = FuelConfig:AddComboBox()
+            --=========================================================================--
+            -- RIGHT BELOW THIS CODE IS STRAIGHT UP COPIED FROM engines.lua MENU CODE  --
+            --=========================================================================--
+            -- Shape selector. The combo value is the ContainerShapes class FQN written straight into the
+            -- "Shape" field; no string->class translation needed at spawn time.
+            local FuelShape = FuelConfig:AddComboBox()
+            FuelShape:AddChoice("Box", "ACF.ContainerShapes.Box")
+            FuelShape:AddChoice("Sphere", "ACF.ContainerShapes.Sphere")
+            FuelShape:AddChoice("Cylinder", "ACF.ContainerShapes.Cylinder")
+
+            -- Set default shape
+            local DefaultShape = ACF.GetClientData("Shape")
+            if not GetType(DefaultShape) then DefaultShape = "ACF.ContainerShapes.Box" end
+            ACF.SetClientData("Shape", DefaultShape, true)
+            FuelShape:ChooseOptionID(DefaultShape == "ACF.ContainerShapes.Sphere" and 2 or DefaultShape == "ACF.ContainerShapes.Cylinder" and 3 or 1)
+            timer.Simple(0, function() if IsValid(FuelShape) then FuelShape:OnSelect(nil, nil, DefaultShape) end end) -- Frown
+
+            local Min = ACF.ContainerMinSize
+            local Max = ACF.ContainerMaxSize
+            local FuelPreview
+
+            -- Set default fuel tank size values before creating sliders to prevent nil value errors
+            local DefaultFuelSizeX = ACF.GetClientNumber("FuelSizeX", (Min + Max) / 2)
+            local DefaultFuelSizeY = ACF.GetClientNumber("FuelSizeY", (Min + Max) / 2)
+            local DefaultFuelSizeZ = ACF.GetClientNumber("FuelSizeZ", (Min + Max) / 2)
+            ACF.SetClientData("FuelSizeX", DefaultFuelSizeX, true)
+            ACF.SetClientData("FuelSizeY", DefaultFuelSizeY, true)
+            ACF.SetClientData("FuelSizeZ", DefaultFuelSizeZ, true)
+
+            local function UpdateSize()
+                -- MARCH: STEVE REMOVE THIS ONCE YOU FIX IT (Or leave it if you are fine with this)
+                ACF.SetClientData("Size", TankSize, true)
+            end
+
+            local SizeX = FuelConfig:AddSlider("#acf.menu.fuel.tank_length", Min, Max)
+            SizeX:SetClientData("FuelSizeX", "OnValueChanged")
+            SizeX:DefineSetter(function(Panel, _, _, Value)
+                local X = Round(Value)
+
+                Panel:SetValue(X)
+
+                TankSize.x = X
+
+                FuelType:UpdateFuelText()
+
+                if FuelPreview then
+                    FuelPreview:SetModelScale(TankSize * 12)
+                end
+
+                UpdateSize()
+                return X
+            end)
+
+            local SizeY = FuelConfig:AddSlider("#acf.menu.fuel.tank_width", Min, Max)
+            SizeY:SetClientData("FuelSizeY", "OnValueChanged")
+            SizeY:DefineSetter(function(Panel, _, _, Value)
+                local Y = Round(Value)
+
+                Panel:SetValue(Y)
+
+                TankSize.y = Y
+
+                FuelType:UpdateFuelText()
+
+                if FuelPreview then
+                    FuelPreview:SetModelScale(TankSize * 12)
+                end
+
+                UpdateSize()
+                return Y
+            end)
+
+            local SizeZ = FuelConfig:AddSlider("#acf.menu.fuel.tank_height", Min, Max)
+            SizeZ:SetClientData("FuelSizeZ", "OnValueChanged")
+            SizeZ:DefineSetter(function(Panel, _, _, Value)
+                local Z = Round(Value)
+
+                Panel:SetValue(Z)
+
+                TankSize.z = Z
+
+                FuelType:UpdateFuelText()
+
+                if FuelPreview then
+                    FuelPreview:SetModelScale(TankSize * 12)
+                end
+
+                UpdateSize()
+                return Z
+            end)
+
+            local FuelBase = FuelConfig:AddCollapsible("#acf.menu.fuel.tank_info", nil, "icon16/cup_edit.png")
+            local FuelDesc = FuelBase:AddLabel()
+            FuelPreview = FuelBase:AddModelPreview(nil, true, "Secondary")
+            local FuelInfo = FuelBase:AddLabel()
+
+            function FuelShape:OnSelect(_, _, Data)
+                ACF.SetClientData("Shape", Data)
+
+                -- Update preview model based on shape
+                local ShapeClass = GetType(Data) or GetType("ACF.ContainerShapes.Box")
+                FuelPreview:UpdateModel(ShapeClass.Model, "models/props_canal/metalcrate001d")
+
+                FuelType:UpdateFuelText()
+            end
+
+            -- We don't work with a preset list of engines, these are created on the run instead.
+            function EngineClass:OnSelect(_, _, Data)
+                if self.Selected == Data then return end
+
+                self.Selected = Data
+
+                local FuelData
+
+                -- Shitty hack to get the type of fuel used for these engine Classes
+                if Data == "ACF.EngineTypes.GenericPetrol" then
+                    FuelData = "ACF.FuelTypes.Petrol"
+                elseif Data == "ACF.EngineTypes.GenericDiesel" then
+                    FuelData = "ACF.FuelTypes.Diesel"
+                end
+
+                local FuelDescription = GetType(FuelData)
+                local Fuel = {FuelData = FuelDescription}
+
+                ACF.SetClientData("EngineClass", Data)
+                ACF.LoadSortedList(FuelType, Fuel, "ID")
+
+                -- Call to Clamp the panel whenever we change fuel types
+                local _, CRMin, CRMax = ClampCR()
+                Clearance:SetMinMax(CRMax, CRMin)
+            end
+
+            function FuelType:OnSelect(Index, _, Data)
+                if self.Selected == Data then return end
+
+                self.ListData.Index = Index
+                self.Selected = Data
+
+                ACF.SetClientData("FuelType", Classes.GetTypeName(Data))
+
+                self:UpdateFuelText()
+            end
+
+            function FuelType:UpdateFuelText()
+                if not self.Selected then return end
+
+                local TextFunc = self.Selected.FuelTankText
+                local FuelText = ""
+
+                local Wall = ACF.ContainerArmor * ACF.MmToInch -- Wall thickness in inches
+                local Shape = GetType(ACF.GetClientData("Shape")) or GetType("ACF.ContainerShapes.Box")
+
+                -- Calculate volume and area using shape calculations
+                local Volume, Area = Shape.ShapeCalculation(TankSize, Wall)
+
+                local Capacity	= Volume * ACF.gCmToKgIn -- Internal volume available for fuel in liters
+                local EmptyMass	= Area * Wall * ACF.InchToCmCu * ACF.SteelDensity -- Total wall volume * cu in to cc * density of steel (kg/cc)
+                local Mass		= EmptyMass + Capacity * self.Selected.Density -- Weight of tank + weight of fuel
+
+                if TextFunc then
+                    FuelText = FuelText .. TextFunc(Capacity, Mass, EmptyMass)
+                else
+                    local Text = language.GetPhrase("acf.menu.fuel.tank_stats")
+                    local Liters = Round(Capacity, 2)
+                    local Gallons = Round(Capacity * ACF.LToGal, 2)
+
+                    FuelText = FuelText .. Text:format(ACF.ContainerArmor, Liters, Gallons, ACF.GetProperMass(Mass), ACF.GetProperMass(EmptyMass))
+                end
+
+                FuelDesc:SetText("Scalable Fuel Tank\n\nShape: " .. (Shape.Name or "Box"))
+                FuelInfo:SetText(FuelText)
+            end
         end
-
-        -- Set the tool's operations 
-        ACF.SetClientData("PrimaryClass", "acf_engine_custom")
-        ACF.SetClientData("SecondaryClass", "acf_fueltank")
-        ACF.SetClientData("FuelTank", "Scalable") -- Set default fuel tank to scalable
-
-        ACF.SetToolMode("acf_menu", "Spawner", "Engine") -- Just in case
     end
 end)    
