@@ -1,6 +1,7 @@
 local ACF     		= ACF
 local Classes 		= ACF.Classes
 local Round   		= math.Round
+local max           = math.max
 local TimerRemove   = timer.Remove
 local Contraption   = ACF.Contraption
 local IsEntityValid = ACF.Optimizations.IsEntityValid
@@ -12,10 +13,12 @@ local function UpdateEngine(Entity, Class)
 	Entity:SetScaledModel(Model)
 
 	local Params = {
-		Pistons   = Entity.Pistons or Class.CustomEnginePistons,
-		Bore	  = Entity.Bore or Class.CustomEngineBore,
-		Stroke 	  = Entity.Stroke or Class.CustomEngineStroke,
-		Clearance = Entity.Clearance or Class.CustomEngineClearance
+		Pistons    = Entity.Pistons or Class.CustomEnginePistons,
+		Bore	   = Entity.Bore or Class.CustomEngineBore,
+		Stroke 	   = Entity.Stroke or Class.CustomEngineStroke,
+		Clearance  = Entity.Clearance or Class.CustomEngineClearance,
+		BankAngle  = Entity.BankAngle or Class.CustomEngineBankAngle,
+		BankAmount = Entity.BankAmount or Class.CustomEngineBankAmount,
 	}
 
 	local EngineClass = Entity.Engine.Class
@@ -41,12 +44,13 @@ local function UpdateEngine(Entity, Class)
 		}
 	end
 
-	local LayoutFactors = Class.GetLayoutFactors(Params.Pistons)
+	local LayoutFactors = Class.GetLayoutFactors(Params.Pistons, Params.BankAngle)
 	local Compute = Class.Compute(_, LayoutFactors, Params, ExtraEngineFields)
 
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
-	local Name = ("%sL %s - %scc"):format(Round(Displacement.InLiters, 1), Sign, Round(Displacement.InCubicCentimeters))
+	local Type = "ACF.EngineTypes.GenericPetrol" and "Petrol" or "ACF.EngineTypes.GenericDiesel" and "Diesel" or "MultiFuel"
+	local Name = ("%sL %s - %s"):format(Round(Displacement.InLiters, 1), Sign, Type)
 
 	-- Class compute table assignments
 	Entity.ACF.Model 		    = Model
@@ -117,6 +121,7 @@ end
 function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	-- These shouldn't exist here, but the class menu stuff isn't finished yet, so we cope with this instead.
+	-- Self.ACF_LiveData simply isn't returning live, updated data values for us to feed the rest just yet. 
 	local Engine = ClientData.EngineType
 	local EngineClass = ClientData.EngineClass
 	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
@@ -162,6 +167,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.Bore          		= ClientData.CustomEngineBore
 	self.Stroke        		= ClientData.CustomEngineStroke
 	self.Clearance     		= ClientData.CustomEngineClearance
+	self.BankAngle          = ClientData.CustomEngineBankAngle or nil
+	self.BankAmount         = ClientData.CustomEngineBankAmount or nil
 
 	duplicator.ClearEntityModifier(self, "mass")
 end
@@ -292,7 +299,7 @@ end
 function ENT:GetCost()
 	local selftbl = self:GetTable()
 
-	return math.max(5, (selftbl.PeakTorque / 160) + (selftbl.PeakPower / 80))
+	return max(5, (selftbl.PeakTorque / 160) + (selftbl.PeakPower / 80))
 end
 
 -- Remove-only teardown. Captured by AutoRegisterV2 as OrigOnRemove; the generated OnRemove still

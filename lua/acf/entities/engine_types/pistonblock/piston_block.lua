@@ -70,13 +70,13 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
 
     MENU_FIELD("ACF.Engines.PistonBlock", "EngineType", {
         "ACF.Engines.InlineEngine",
-        "BoxerEngine",
+        "ACF.Engines.BoxerEngine",
         "ACF.Engines.VTypeEngine",
-        "WRTypeEngine",
-        "RotaryEngine",
-        "RadialEngine",
-        "SingleMonoEngine",
-        "ParallelTwinEngine"
+        "ACF.Engines.WRTypeEngine",
+        "ACF.Engines.RotaryEngine",
+        "ACF.Engines.RadialEngine",
+        "ACF.Engines.SingleMonoEngine",
+        "ACF.Engines.ParallelTwinEngine"
     })
 
     -- ── Compression ratio bounds, keyed by ignition type ───────
@@ -630,136 +630,183 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
             local TypeSelector = Classes.CreateTypeSelector(SubMenu, CLASS, "EngineType")
             local ClassList    = TypeSelector.ComboBox
 
-            if ClassList and ClassList.Selected then
+            local SubPanel = SubMenu:AddPanel("ACF_Panel")
+
+            local function BuildMenu(SUPER, SuperMenu)
+                local EngineDescLabel
+                local BankAnglePanel
+                local BankAmountPanel
+
+                -- Variables to fetch any options from our Class Fields
+                local ModelOpts     = Classes.GetTypeFieldByName(SUPER, "CustomEngineModel").Options
+                local PistonOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEnginePistons").Options
+                local BoreOpts      = Classes.GetTypeFieldByName(SUPER, "CustomEngineBore").Options
+                local StrokeOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEngineStroke").Options
+                local ClearanceOpts = Classes.GetTypeFieldByName(SUPER, "CustomEngineClearance").Options
+
+                -- Clamps a raw compression ratio (derived from stroke/clearance) into the realistic range
+                -- for the given fuel type, and back-corrects clearance to match if clamping changed it.
+                local function ClampCR(Stroke, Clearance)
+                    local __Stroke = Stroke or ACF.GetClientData("CustomEngineStroke", StrokeOpts.Default)
+                    local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
+                    local EngineType = ACF.GetClientData("EngineClass", "ACF.EngineTypes.GenericPetrol")
+                    local FuelType = EngineType == "ACF.EngineTypes.GenericPetrol" and "spark" or "glow"
+
+                    local CorrectedClearance = __Clearance
+                    local Bounds = CR_BOUNDS[FuelType] or CR_BOUNDS_DEFAULT
+
+                    local CR_raw = 1 + __Stroke / __Clearance
+                    local CR     = Clamp(CR_raw, Bounds.min, Bounds.max)
+                    if CR ~= CR_raw then CorrectedClearance = __Stroke / (CR - 1) end
+
+                    -- Get the clamped limits
+                    local Min = __Stroke / (Bounds.min - 1)
+                    local Max = __Stroke / (Bounds.max - 1)
+
+                    return CorrectedClearance, Min, Max
+                end
+
+                -- Local functions just to update our labels
+                local function UpdatePreview(Panel, Data)
+                    Panel:UpdateModel(Data)
+                end
+
+                local function UpdateEngineStats(Panel, Pistons, Bore, Stroke, Clearance)
+                    local __Pistons   = Round(Pistons or ACF.GetClientNumber("CustomEnginePistons", PistonOpts.Default))
+                    local __Bore      = Bore or ACF.GetClientNumber("CustomEngineBore", BoreOpts.Default)
+                    local __Stroke    = Stroke or ACF.GetClientNumber("CustomEngineStroke", StrokeOpts.Default)
+                    local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
+
+                    -- ── Swept volume and displacement ──────────────────
+                    -- V_swept (cm³) = π/4 × bore² × stroke
+                    -- V_displ (L)   = V_swept × pistons × 0.001
+                    -- The values above are also rounded to the nearest 2 decimals
+                    local V_swept = Round((PI / 4) * __Bore * __Bore * __Stroke, 2)
+                    local V_displ = Round(V_swept * __Pistons * 0.001, 2)
+                    local CRatio  = Round(1 + __Stroke / __Clearance, 2)
+
+                    local Label = ("Compression Ratio: %s:1\
+                                    \nSwept Volume per piston: %s cm³\
+                                    \nDisplacement: %s L"):format(CRatio, V_swept, V_displ)
+
+                    Panel:SetText(Label)
+                end
+
+                local BankAngle = Classes.GetTypeFieldByName(SUPER, "CustomEngineBankAngle")
+                local BankAngleOpts = BankAngle and BankAngle.Options
+
+                local BankAmount = Classes.GetTypeFieldByName(SUPER, "CustomEngineBankAmount")
+                local BankAmountOpts = BankAmount and BankAmount.Options
+
+                local EngineBase = SuperMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
+                local EngineName = EngineBase:AddTitle()
+                local EngineDesc = EngineBase:AddLabel()
+
+                EngineName:SetText(SUPER.Name)
+                EngineDesc:SetText(SUPER.Description)
+
+                local EnginePreview = EngineBase:AddModelPreview(nil, true, "Primary")
+                local EngineStats = EngineBase:AddTitle()
+                EngineStats:SetText("Engine Stats")
+                EngineDescLabel = EngineBase:AddLabel()
+
+                UpdateEngineStats(EngineDescLabel)
+                UpdatePreview(EnginePreview, ACF.GetClientData("CustomEngineModel", ModelOpts.Default))
+
+                local EngineConfig = SuperMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
+
+                local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
+                Pistons:SetValue(ACF.GetClientNumber("CustomEnginePistons", NestedData.CustomEnginePistons or PistonOpts.Default))
+                Pistons:SetClientData("CustomEnginePistons", "OnValueChanged")
+                Pistons:DefineSetter(function(Panel, _, _, Value)
+                    if PistonOpts.IsEvenNumber then
+                        -- Enforce even cylinder count
+                        Value = max(2, (Value % 2 == 0) and Value or Value - 1)
+                    end
+                    Panel:SetValue(Round(Value, PistonOpts.Decimals or 0))
+
+                    -- Set the engine's preview model too
+                    local ClassModel = SUPER.Model
+
+                    NestedData.CustomEngineModel = (ClassModel):format(Round(Value, PistonOpts.Decimals or 0) or ModelOpts.Default)
+                    ACF.SetClientData("CustomEngineModel", NestedData.CustomEngineModel)
+
+                    UpdatePreview(EnginePreview, NestedData.CustomEngineModel)
+                    UpdateEngineStats(EngineDescLabel, Value)
+                    PushData()
+                end)
+
+                local Bore = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
+                Bore:SetValue(ACF.GetClientNumber("CustomEngineBore", NestedData.CustomEngineBore or BoreOpts.Default))
+                Bore:SetClientData("CustomEngineBore", "OnValueChanged")
+                Bore:DefineSetter(function(Panel, _, _, Value)
+                    Panel:SetValue(Round(Value, BoreOpts.Decimals or 2))
+                    UpdateEngineStats(EngineDescLabel, nil, Value)
+                    PushData()
+                end)
+
+                local Stroke = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
+                Stroke:SetValue(ACF.GetClientNumber("CustomEngineStroke", NestedData.CustomEngineStroke or StrokeOpts.Default))
+                Stroke:SetClientData("CustomEngineStroke", "OnValueChanged")
+
+                local Clearance = EngineConfig:AddSlider("Piston TDC Clearance (cm)", ClearanceOpts.Min, ClearanceOpts.Max, ClearanceOpts.Decimals)
+                Clearance:SetValue(ACF.GetClientNumber("CustomEngineClearance", NestedData.CustomEngineClearance or ClearanceOpts.Default))
+                Clearance:SetClientData("CustomEngineClearance", "OnValueChanged")
+                Clearance:DefineSetter(function(Panel, _, _, Value)
+                    local CorrectedCR = ClampCR(Stroke:GetValue(), Value)
+
+                    Panel:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
+                    UpdateEngineStats(EngineDescLabel, nil, nil, nil, Value)
+                    PushData()
+                end)
+
+                Stroke:DefineSetter(function(Panel, _, _, Value)
+                    Panel:SetValue(Round(Value, StrokeOpts.Decimals or 2))
+
+                    local _, CRMin, CRMax = ClampCR(Value, Clearance:GetValue())
+                    Clearance:SetMinMax(CRMax, CRMin)
+
+                    UpdateEngineStats(EngineDescLabel, nil, nil, Value, nil)
+                    PushData()
+                end)
+
+                if BankAngleOpts then
+                    BankAnglePanel = EngineConfig:AddSlider("Bank Angle", BankAngleOpts.Min, BankAngleOpts.Max, BankAngleOpts.Decimals)
+                    BankAnglePanel:SetValue(ACF.GetClientNumber("CustomEngineBankAngle", NestedData.CustomEngineBankAngle or BankAngleOpts.Default))
+                    BankAnglePanel:SetClientData("CustomEngineBankAngle", "OnValueChanged")
+                    BankAnglePanel:DefineSetter(function(Panel, _, _, Value)
+                        Panel:SetValue(Value)
+                    end)
+                end
+
+                if BankAmountOpts then
+                    BankAmountPanel = EngineConfig:AddSlider("Bank Amount", BankAmountOpts.Min, BankAmountOpts.Max, BankAmountOpts.Decimals)
+                    BankAmountPanel:SetValue(ACF.GetClientNumber("CustomEngineBankAmount", NestedData.CustomEngineBankAmount or BankAmountOpts.Default))
+                    BankAmountPanel:SetClientData("CustomEngineBankAmount", "OnValueChanged")
+                    BankAmountPanel:DefineSetter(function(Panel, _, _, Value)
+                        Panel:SetValue(Value)
+                    end)
+                end
+            end
+
+            function ClassList:OnSelect(Index, _, Data)
+                if self.Selected == Data then return end
+
+                self.ListData.Index = Index
+                self.Selected = Data
+
                 local TypeName = Classes.GetTypeName(ClassList.Selected)
 
                 ACF.SetClientData("EngineType", TypeName)
                 ACF.SetClientData("EngineClassData", ClassList.Selected)
+
+                SubMenu:ClearTemporal(SubPanel)
+                SubMenu:StartTemporal(SubPanel)
+
+                BuildMenu(ClassList.Selected, SubPanel)
+
+                SubMenu:EndTemporal(SubPanel)
             end
-
-            local EngineDescLabel
-            local SUPER = ACF.GetClientData("EngineClassData") -- TODO: Add default option here
-
-            -- Variables to fetch any options from our Class Fields
-            local ModelOpts     = Classes.GetTypeFieldByName(SUPER, "CustomEngineModel").Options
-            local PistonOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEnginePistons").Options
-            local BoreOpts      = Classes.GetTypeFieldByName(SUPER, "CustomEngineBore").Options
-            local StrokeOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEngineStroke").Options
-            local ClearanceOpts = Classes.GetTypeFieldByName(SUPER, "CustomEngineClearance").Options
-
-            -- Clamps a raw compression ratio (derived from stroke/clearance) into the realistic range
-            -- for the given fuel type, and back-corrects clearance to match if clamping changed it.
-            local function ClampCR(Stroke, Clearance)
-                local __Stroke = Stroke or ACF.GetClientData("CustomEngineStroke", StrokeOpts.Default)
-                local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
-                local EngineType = ACF.GetClientData("EngineClass", "ACF.EngineTypes.GenericPetrol")
-                local FuelType = EngineType == "ACF.EngineTypes.GenericPetrol" and "spark" or "glow"
-
-                local CorrectedClearance = __Clearance
-                local Bounds = CR_BOUNDS[FuelType] or CR_BOUNDS_DEFAULT
-
-                local CR_raw = 1 + __Stroke / __Clearance
-                local CR     = Clamp(CR_raw, Bounds.min, Bounds.max)
-                if CR ~= CR_raw then CorrectedClearance = __Stroke / (CR - 1) end
-
-                -- Get the clamped limits
-                local Min = __Stroke / (Bounds.min - 1)
-                local Max = __Stroke / (Bounds.max - 1)
-
-                return CorrectedClearance, Min, Max
-            end
-
-            -- Local functions just to update our labels
-            local function UpdatePreview(Panel, Data)
-                Panel:UpdateModel(Data)
-            end
-
-            local function UpdateEngineStats(Pistons, Bore, Stroke, Clearance)
-                local __Pistons   = Round(Pistons or ACF.GetClientNumber("CustomEnginePistons", PistonOpts.Default))
-                local __Bore      = Bore or ACF.GetClientNumber("CustomEngineBore", BoreOpts.Default)
-                local __Stroke    = Stroke or ACF.GetClientNumber("CustomEngineStroke", StrokeOpts.Default)
-                local __Clearance = Clearance or ACF.GetClientNumber("CustomEngineClearance", ClearanceOpts.Default)
-
-                -- ── Swept volume and displacement ──────────────────
-                -- V_swept (cm³) = π/4 × bore² × stroke
-                -- V_displ (L)   = V_swept × pistons × 0.001
-                -- The values above are also rounded to the nearest 2 decimals
-                local V_swept = Round((PI / 4) * __Bore * __Bore * __Stroke, 2)
-                local V_displ = Round(V_swept * __Pistons * 0.001, 2)
-                local CRatio  = Round(1 + __Stroke / __Clearance, 2)
-
-                local Label = ("Compression Ratio: %s:1\
-                                \nSwept Volume per piston: %s cm³\
-                                \nDisplacement: %s L"):format(CRatio, V_swept, V_displ)
-
-                EngineDescLabel:SetText(Label)
-            end
-
-            local EngineBase = SubMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
-            local EngineName = EngineBase:AddTitle()
-            local EngineDesc = EngineBase:AddLabel()
-
-            EngineName:SetText(CLASS.Name)
-            EngineDesc:SetText(CLASS.Description)
-
-            local EnginePreview = EngineBase:AddModelPreview(nil, true, "Primary")
-            local EngineStats = EngineBase:AddTitle()
-            EngineStats:SetText("Engine Stats")
-            EngineDescLabel = EngineBase:AddLabel()
-
-            UpdateEngineStats()
-            UpdatePreview(EnginePreview, ACF.GetClientData("CustomEngineModel", ModelOpts.Default))
-
-            local EngineConfig = SubMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
-
-            local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
-            Pistons:SetValue(ACF.GetClientNumber("CustomEnginePistons", NestedData.CustomEnginePistons or PistonOpts.Default))
-            Pistons:SetClientData("CustomEnginePistons", "OnValueChanged")
-            Pistons:DefineSetter(function(Panel, _, _, Value)
-                Panel:SetValue(Round(Value, PistonOpts.Decimals or 0))
-
-                -- Set the engine's preview model too
-                NestedData.CustomEngineModel = ("models/engines/inline%ss.mdl"):format(Round(Value, PistonOpts.Decimals or 0) or ModelOpts.Default)
-                ACF.SetClientData("CustomEngineModel", NestedData.CustomEngineModel)
-
-                UpdatePreview(EnginePreview, NestedData.CustomEngineModel)
-                UpdateEngineStats(Value)
-                PushData()
-            end)
-
-            local Bore = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
-            Bore:SetValue(ACF.GetClientNumber("CustomEngineBore", NestedData.CustomEngineBore or BoreOpts.Default))
-            Bore:SetClientData("CustomEngineBore", "OnValueChanged")
-            Bore:DefineSetter(function(Panel, _, _, Value)
-                Panel:SetValue(Round(Value, BoreOpts.Decimals or 2))
-                UpdateEngineStats(nil, Value)
-                PushData()
-            end)
-
-            local Stroke = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
-            Stroke:SetValue(ACF.GetClientNumber("CustomEngineStroke", NestedData.CustomEngineStroke or StrokeOpts.Default))
-            Stroke:SetClientData("CustomEngineStroke", "OnValueChanged")
-
-            local Clearance = EngineConfig:AddSlider("Piston TDC Clearance (cm)", ClearanceOpts.Min, ClearanceOpts.Max, ClearanceOpts.Decimals)
-            Clearance:SetValue(ACF.GetClientNumber("CustomEngineClearance", NestedData.CustomEngineClearance or ClearanceOpts.Default))
-            Clearance:SetClientData("CustomEngineClearance", "OnValueChanged")
-            Clearance:DefineSetter(function(Panel, _, _, Value)
-                local CorrectedCR = ClampCR(Stroke:GetValue(), Value)
-
-                Panel:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
-                UpdateEngineStats(nil, nil, nil, Value)
-                PushData()
-            end)
-
-            Stroke:DefineSetter(function(Panel, _, _, Value)
-                Panel:SetValue(Round(Value, StrokeOpts.Decimals or 2))
-
-                local _, CRMin, CRMax = ClampCR(Value, Clearance:GetValue())
-                Clearance:SetMinMax(CRMax, CRMin)
-
-                UpdateEngineStats(nil, nil, Value, nil)
-                PushData()
-            end)
 
             ACF.SetClientData("PrimaryClass", "acf_engine_custom")
             ACF.SetClientData("SecondaryClass", "acf_fueltank")
@@ -904,8 +951,8 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
                 ACF.LoadSortedList(FuelType, Fuel, "ID")
 
                 -- Call to Clamp the panel whenever we change fuel types
-                local _, CRMin, CRMax = ClampCR()
-                Clearance:SetMinMax(CRMax, CRMin)
+                -- local _, CRMin, CRMax = ClampCR()
+                -- Clearance:SetMinMax(CRMax, CRMin)
             end
 
             function FuelType:OnSelect(Index, _, Data)
