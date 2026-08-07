@@ -12,6 +12,8 @@ local max     = math.max
 local pow     = math.pow
 local sqrt    = math.sqrt
 
+local PAGE    = "acf_engine_custom"
+
 -- ===========================================================================
 --  Base piston block class definition 
 --
@@ -43,7 +45,8 @@ local sqrt    = math.sqrt
 --
 -- ===========================================================================
 
-Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", function()
+-- MARK: Class definition
+Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngineBlock", function()
     CLASS.Name          = "Piston Block Class"
     CLASS.Description   = "The base class for any and all piston engines."
     CLASS.ToolDesc      = "Attempts to spawn the selected piston engine."
@@ -68,15 +71,15 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
     -- Wankel: power strokes per rotor per shaft revolution
     --CLASS.WANKEL_POWER_STROKES = 3  -- TODO: This shouldn't be here IMHO
 
-    MENU_FIELD("ACF.Engines.PistonBlock", "EngineType", {
-        "ACF.Engines.InlineEngine",
-        "ACF.Engines.BoxerEngine",
-        "ACF.Engines.VTypeEngine",
-        "ACF.Engines.WRTypeEngine",
-        "ACF.Engines.RotaryEngine",
-        "ACF.Engines.RadialEngine",
-        "ACF.Engines.SingleMonoEngine",
-        "ACF.Engines.ParallelTwinEngine"
+    MENU_FIELD("ACF.CustomEngines.PistonBlock", "EngineType", {
+        "ACF.CustomEngines.InlineEngine",
+        "ACF.CustomEngines.BoxerEngine",
+        "ACF.CustomEngines.VTypeEngine",
+        "ACF.CustomEngines.WRTypeEngine",
+        "ACF.CustomEngines.RotaryEngine",
+        "ACF.CustomEngines.RadialEngine",
+        "ACF.CustomEngines.SingleMonoEngine",
+        "ACF.CustomEngines.ParallelTwinEngine"
     })
 
     -- ── Compression ratio bounds, keyed by ignition type ───────
@@ -211,6 +214,7 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
     end
 
     --- Concrete layouts call this after setting their own GetLayoutFactors.
+    -- MARK: CLASS.Compute
     function CLASS.Compute(SUPER, LayoutFactors, Params)
         if not SUPER then return end -- TODO: Maybe another check here if its a class?
         if not Params and istable(Params) then return end
@@ -622,13 +626,13 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
     -- me off of that way. So instead menus will have to be done within the file/class that
     -- defines them.
 
-    do
+    do -- MARK: Menu code
         local GetType = Classes.GetTypeByName
         local TankSize = Vector()
 
-        function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-            local TypeSelector = Classes.CreateTypeSelector(SubMenu, CLASS, "EngineType")
-            local ClassList    = TypeSelector.ComboBox
+        function CLASS.CreateMenu(SubMenu, NestedData, Context)
+            local ClassList = SubMenu:AddComboBox()
+            ACF.Menu.LoadClassCombo(ClassList, Classes.GetChildren(CLASS), "Name", nil, "acf_engine_custom", "engine")
 
             local SubPanel = SubMenu:AddPanel("ACF_Panel")
 
@@ -717,75 +721,71 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
 
                 local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
                 Pistons:SetValue(ACF.GetClientNumber("CustomEnginePistons", NestedData.CustomEnginePistons or PistonOpts.Default))
-                Pistons:SetClientData("CustomEnginePistons", "OnValueChanged")
-                Pistons:DefineSetter(function(Panel, _, _, Value)
+                function Pistons:OnValueChanged(Value)
                     if PistonOpts.IsEvenNumber then
                         -- Enforce even cylinder count
                         Value = max(2, (Value % 2 == 0) and Value or Value - 1)
                     end
-                    Panel:SetValue(Round(Value, PistonOpts.Decimals or 0))
+                    self:SetValue(Round(Value, PistonOpts.Decimals or 0))
 
                     -- Set the engine's preview model too
                     local ClassModel = SUPER.Model
 
                     NestedData.CustomEngineModel = (ClassModel):format(Round(Value, PistonOpts.Decimals or 0) or ModelOpts.Default)
-                    ACF.SetClientData("CustomEngineModel", NestedData.CustomEngineModel)
+                    Context:Set("CustomEnginePistons", Value)
+                    Context:Set("CustomEngineModel", NestedData.CustomEngineModel)
 
                     UpdatePreview(EnginePreview, NestedData.CustomEngineModel)
                     UpdateEngineStats(EngineDescLabel, Value)
-                    PushData()
-                end)
+                end
 
                 local Bore = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
                 Bore:SetValue(ACF.GetClientNumber("CustomEngineBore", NestedData.CustomEngineBore or BoreOpts.Default))
-                Bore:SetClientData("CustomEngineBore", "OnValueChanged")
-                Bore:DefineSetter(function(Panel, _, _, Value)
-                    Panel:SetValue(Round(Value, BoreOpts.Decimals or 2))
+                function Bore:OnValueChanged(Value)
+                    self:SetValue(Round(Value, BoreOpts.Decimals or 2))
+                    Context:Set("CustomEngineBore", Value)
                     UpdateEngineStats(EngineDescLabel, nil, Value)
-                    PushData()
-                end)
+                end
 
                 local Stroke = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
                 Stroke:SetValue(ACF.GetClientNumber("CustomEngineStroke", NestedData.CustomEngineStroke or StrokeOpts.Default))
-                Stroke:SetClientData("CustomEngineStroke", "OnValueChanged")
 
                 local Clearance = EngineConfig:AddSlider("Piston TDC Clearance (cm)", ClearanceOpts.Min, ClearanceOpts.Max, ClearanceOpts.Decimals)
                 Clearance:SetValue(ACF.GetClientNumber("CustomEngineClearance", NestedData.CustomEngineClearance or ClearanceOpts.Default))
-                Clearance:SetClientData("CustomEngineClearance", "OnValueChanged")
-                Clearance:DefineSetter(function(Panel, _, _, Value)
+                function Clearance:OnValueChanged(Value)
                     local CorrectedCR = ClampCR(Stroke:GetValue(), Value)
 
-                    Panel:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
+                    self:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
+                    Context:Set("CustomEngineClearance", Value)
                     UpdateEngineStats(EngineDescLabel, nil, nil, nil, Value)
-                    PushData()
-                end)
+                end
 
-                Stroke:DefineSetter(function(Panel, _, _, Value)
-                    Panel:SetValue(Round(Value, StrokeOpts.Decimals or 2))
+                function Stroke:OnValueChanged(Value)
+                    self:SetValue(Round(Value, StrokeOpts.Decimals or 2))
 
                     local _, CRMin, CRMax = ClampCR(Value, Clearance:GetValue())
                     Clearance:SetMinMax(CRMax, CRMin)
 
+                    Context:Set("CustomEngineStroke", Value)
                     UpdateEngineStats(EngineDescLabel, nil, nil, Value, nil)
-                    PushData()
-                end)
+                end
 
                 if BankAngleOpts then
                     BankAnglePanel = EngineConfig:AddSlider("Bank Angle", BankAngleOpts.Min, BankAngleOpts.Max, BankAngleOpts.Decimals)
                     BankAnglePanel:SetValue(ACF.GetClientNumber("CustomEngineBankAngle", NestedData.CustomEngineBankAngle or BankAngleOpts.Default))
-                    BankAnglePanel:SetClientData("CustomEngineBankAngle", "OnValueChanged")
-                    BankAnglePanel:DefineSetter(function(Panel, _, _, Value)
-                        Panel:SetValue(Value)
-                    end)
+                    function BankAnglePanel:OnValueChanged(Value)
+                        Context:Set("CustomEngineBankAngle", Value)
+                        self:SetValue(Value)
+                    end
                 end
 
                 if BankAmountOpts then
                     BankAmountPanel = EngineConfig:AddSlider("Bank Amount", BankAmountOpts.Min, BankAmountOpts.Max, BankAmountOpts.Decimals)
                     BankAmountPanel:SetValue(ACF.GetClientNumber("CustomEngineBankAmount", NestedData.CustomEngineBankAmount or BankAmountOpts.Default))
-                    BankAmountPanel:SetClientData("CustomEngineBankAmount", "OnValueChanged")
-                    BankAmountPanel:DefineSetter(function(Panel, _, _, Value)
-                        Panel:SetValue(Value)
-                    end)
+                    function BankAmountPanel:OnValueChanged(Value)
+                        Context:Set("CustomEngineBankAmount", Value)
+                        self:SetValue(Value)
+                    end
                 end
             end
 
@@ -797,8 +797,8 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
 
                 local TypeName = Classes.GetTypeName(ClassList.Selected)
 
-                ACF.SetClientData("EngineType", TypeName)
-                ACF.SetClientData("EngineClassData", ClassList.Selected)
+                Context:Set("Engine", TypeName)
+                ACF.Menu.SaveClassCombo(PAGE, "engine", TypeName)
 
                 SubMenu:ClearTemporal(SubPanel)
                 SubMenu:StartTemporal(SubPanel)
@@ -811,8 +811,6 @@ Classes.DefineClass("ACF.Engines.PistonBlock", "ACF.Engines.BaseEngineBlock", fu
             ACF.SetClientData("PrimaryClass", "acf_engine_custom")
             ACF.SetClientData("SecondaryClass", "acf_fueltank")
             ACF.SetClientData("FuelTank", "Scalable") -- Set default fuel tank to scalable
-
-            ACF.SetToolMode("acf_menu", "Spawner", "Engine") -- Just in case
 
             -- Fuel config labels and stuff 
             local FuelConfig = SubMenu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")

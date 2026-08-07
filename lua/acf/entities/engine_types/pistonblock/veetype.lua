@@ -5,7 +5,7 @@ local abs     = math.abs
 local max     = math.max
 local Clamp   = math.Clamp
 
-Classes.DefineClass("ACF.Engines.VTypeEngine", "ACF.Engines.PistonBlock", function()
+Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBlock", function()
     CLASS.Name                 = "V-Type Engine"
     CLASS.Description          = "A piston engine in a V configuration"
     CLASS.Model                = "models/engines/v%ss.mdl"

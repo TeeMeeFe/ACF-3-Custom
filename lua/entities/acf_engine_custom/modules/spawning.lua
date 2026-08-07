@@ -6,22 +6,25 @@ local TimerRemove   = timer.Remove
 local Contraption   = ACF.Contraption
 local IsEntityValid = ACF.Optimizations.IsEntityValid
 
-local function UpdateEngine(Entity, Class)
+local function UpdateEngine(Entity, ClassData)
+
+	PrintTable({Entity.ACF_LiveData:GetType(), ClassData, Entity})
+
 	Entity.ACF = Entity.ACF or {}
 
-	local Model = Entity.Model or Class.CustomEngineModel
+	local Model = ClassData.CustomEngineModel
 	Entity:SetScaledModel(Model)
 
 	local Params = {
-		Pistons    = Entity.Pistons or Class.CustomEnginePistons,
-		Bore	   = Entity.Bore or Class.CustomEngineBore,
-		Stroke 	   = Entity.Stroke or Class.CustomEngineStroke,
-		Clearance  = Entity.Clearance or Class.CustomEngineClearance,
-		BankAngle  = Entity.BankAngle or Class.CustomEngineBankAngle,
-		BankAmount = Entity.BankAmount or Class.CustomEngineBankAmount,
+		Pistons    = Entity.Pistons or ClassData.CustomEnginePistons,
+		Bore	   = Entity.Bore or ClassData.CustomEngineBore,
+		Stroke 	   = Entity.Stroke or ClassData.CustomEngineStroke,
+		Clearance  = Entity.Clearance or ClassData.CustomEngineClearance,
+		BankAngle  = Entity.BankAngle or ClassData.CustomEngineBankAngle,
+		BankAmount = Entity.BankAmount or ClassData.CustomEngineBankAmount,
 	}
 
-	local EngineClass = Entity.Engine.Class
+	local EngineClass = "ACF.EngineTypes.GenericPetrol" -- Entity.Engine.ClassData
 	local FuelTypes = {}
 	local ExtraEngineFields = {}
 	-- Shitty hack to get the type of fuel used for these engine Classes
@@ -44,8 +47,8 @@ local function UpdateEngine(Entity, Class)
 		}
 	end
 
-	local LayoutFactors = Class.GetLayoutFactors(Params.Pistons, Params.BankAngle)
-	local Compute = Class.Compute(_, LayoutFactors, Params, ExtraEngineFields)
+	local LayoutFactors = ClassData.GetLayoutFactors(Params.Pistons, Params.BankAngle)
+	local Compute = ClassData.Compute(_, LayoutFactors, Params, ExtraEngineFields)
 
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
@@ -122,17 +125,13 @@ function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	-- These shouldn't exist here, but the class menu stuff isn't finished yet, so we cope with this instead.
 	-- Self.ACF_LiveData simply isn't returning live, updated data values for us to feed the rest just yet. 
-	local Engine = ClientData.EngineType
-	local EngineClass = ClientData.EngineClass
-	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
 
-	Engine.Class = EngineClass -- Doesn't save for duplicator
+	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
 
 	self.ACF 				= {}
 	self.Active        		= false
 	self.AmbientTemp        = AmbientTemperature
-	self.Engine          	= Engine
-	self.EngineFieldData   	= Classes.GetTypeByName(EngineType)
+	self.EngineClassType    = ClientData.BlockType.Type
 	self.ExhaustEntity 		= nil
 	self.FuelTypes			= {}
 	self.FuelTanks     		= {}
@@ -161,14 +160,6 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.LastOilTemp        = AmbientTemperature
 	self.Temperature   		= {Coolant = AmbientTemperature, Oil = AmbientTemperature}
 	self.WaterPumpFlow		= 0
-	-- Cope, cry and seethe 
-	self.Model              = ClientData.CustomEngineModel
-	self.Pistons 	   		= ClientData.CustomEnginePistons
-	self.Bore          		= ClientData.CustomEngineBore
-	self.Stroke        		= ClientData.CustomEngineStroke
-	self.Clearance     		= ClientData.CustomEngineClearance
-	self.BankAngle          = ClientData.CustomEngineBankAngle or nil
-	self.BankAmount         = ClientData.CustomEngineBankAmount or nil
 
 	duplicator.ClearEntityModifier(self, "mass")
 end

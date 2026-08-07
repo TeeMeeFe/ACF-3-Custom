@@ -1,7 +1,7 @@
 local ACF         = ACF
 local Classes     = ACF.Classes
 
-Classes.DefineClass("ACF.Engines.InlineEngine", "ACF.Engines.PistonBlock", function()
+Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonBlock", function()
     CLASS.Name                 = "Inline Engine"
     CLASS.Description          = "A piston engine in a inlined configuration"
     CLASS.Model                = "models/engines/inline%ss.mdl"

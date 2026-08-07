@@ -1,10 +1,10 @@
 -- Base turbine block class definition
-ACF.Classes.DefineClass("ACF.Engines.TurbineBlock", "ACF.Engines.BaseEngineBlock", function()
+ACF.Classes.DefineClass("ACF.CustomEngines.TurbineBlock", "ACF.CustomEngines.BaseEngineBlock", function()
     CLASS.Name = "Turbine Block Class"
     CLASS.Description = "The base class for any and all types of turbines."
     CLASS.ToolDesc    = "Attempts to spawn the selected turbine."
 
-    MENU_FIELD("ACF.Engines.TurbineBlock", "TurbineTypes", {
+    MENU_FIELD("ACF.CustomEngines.TurbineBlock", "TurbineTypes", {
         "GasTurbine",
         "GroundGasTurbine",
         "PulseJet",

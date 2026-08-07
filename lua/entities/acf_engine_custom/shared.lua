@@ -9,8 +9,7 @@ ENT.ACF_PreventArmoring = true
 ENT.IsACFCustomEngine = true
 
 ACF.Entities.AutoRegisterV2(function()
-    MENU_FIELD("ACF.Engines.BaseEngineBlock", "BlockType", {InstantiateTypeForDefault = "ACF.Engines.PistonBlock", OnlyAllowSubtypes = true})
-    MENU_FIELD("ACF.Engines.PistonBlock", "EngineType", {InstantiateTypeForDefault = "ACF.Engines.InlineEngine", OnlyAllowSubtypes = true})
+    MENU_FIELD("ACF.CustomEngines.BaseEngineBlock", "BlockType", {InstantiateTypeForDefault = "ACF.CustomEngines.PistonBlock", OnlyAllowSubtypes = true})
 
     -- Nothing to validate: the Engine field is constrained to ACF.Engines.* subtypes by the serializer.
     function CLASS:VerifyData() end
