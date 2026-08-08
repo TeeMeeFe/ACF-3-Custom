@@ -1,39 +1,58 @@
-local ACF = ACF
+local ACF     = ACF
 local Classes = ACF.Classes
+local GetType = Classes.GetTypeByName
+local PAGE    = "acf_radiator"
 
-local function CreateMenu(Menu)
-    -- Set the tool's operations 
-    ACF.SetClientData("PrimaryClass", "acf_radiator")
-    ACF.SetClientData("SecondaryClass", "N/A")
+local RADIATOR_BASE = "ACF.Radiators.BaseRadiator"
 
-    ACF.SetToolMode("acf_menu", "Spawner", "Radiator")
-
+local function Build(Menu, Context)
     Menu:AddTitle("Radiator Settings")
     Menu:AddLabel("Allows you to efficiently cool down and stabilize an engine's temperature.")
 
-    local RadiatorClass = Classes.GetTypeByName("acf_radiator")
-    local TypeSelector  = Classes.CreateTypeSelector(Menu, RadiatorClass, "Radiator")
-    local ClassList     = TypeSelector.ComboBox
+    local Entries = Classes.GetChildren(GetType(RADIATOR_BASE))
+    local Radiator = Context.Radiator
 
-    -- Ideally the rest of the menus would go here or in the base radiator class.
-    -- Biggest problem i'm currently facing with this menu code is carrying-fetching data around.
-    -- In this file i can know which class was selected, but i cannot fetch the class' field data. 
-    -- (I don't know the field method to fetch them nor what argument value/type they take)
-    -- Instead if the menu gets built in the selected class, i get access to the class' fields to build
-    -- the menu but i cannot figure out a pattern to fetch whose class was selected from this menu panel.
-    -- Not even doing the datavar below does the trick and methinks the order and realm of when things 
-    -- happen and where, those don't exactly match for my usecase.
-    -- So instead i'm taking the dumb, redundant course here and build a menu for every class...
-    -- TLDR: This menu sucks r/bigdickproblems and needs to be rewritten. 
-    if ClassList and ClassList.Selected then
-        local TypeName = ACF.Classes.GetTypeName(ClassList.Selected)
-        ACF.SetClientData("Radiator", TypeName)
-    end
+    local RadiatorTypeDef = Menu:AddComboBox()
+    RadiatorTypeDef:SetName("RadiatorTypeDef")
 
-    function TypeSelector.OnTypeChanged(TypeObj)
-        local TypeName = ACF.Classes.GetTypeName(TypeObj)
-        ACF.SetClientData("Radiator", TypeName)
+    local SubPanel = Menu:AddPanel("ACF_Panel")
+
+    ACF.Menu.LoadClassCombo(RadiatorTypeDef, Entries, "Name", nil, PAGE, "radiator")
+
+    function RadiatorTypeDef:OnSelect(Index, _, Data)
+        if self.Selected == Data then return end
+
+        self.ListData.Index = Index
+        self.Selected = Data
+
+        ACF.Menu.SaveClassCombo(PAGE, "radiator", Data)
+        Radiator:Set("RadiatorType", Classes.GetTypeName(Data))
+
+        Menu:ClearTemporal(SubPanel)
+        Menu:StartTemporal(SubPanel)
+
+        if Data.CreateMenu then
+            -- Equivalently ClassData.CreateMenu(ClassData, ListData, Menu, Base, UseLegacyRatios)
+            Data.CreateMenu(SubPanel, Data, Radiator)
+        end
+
+        Menu:EndTemporal(SubPanel)
     end
 end
 
-ACF.AddMenuItem(298, "#acf.menu.entities", "Radiators", "water", CreateMenu)
+ACF.Menu.RegisterPage({
+    ID       = "acf_radiator",
+    Category = "#acf.menu.entities",
+    Name     = "Radiators",
+    Icon     = "water",
+    Order    = 298,
+
+    Contexts = { Radiator = "acf_radiator" },
+
+    Actions = {
+        { Bind = "left", Context = "Radiator", Preview = true, Desc = "Spawn a new radiator, or update the one you're aiming at." },
+        { Bind = "right", Commit = "link", Desc = "Select a radiator, then an engine, to link them (hold R to unlink)." },
+    },
+
+    Build = Build,
+})

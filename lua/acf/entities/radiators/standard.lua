@@ -12,13 +12,6 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
     CLASS.BaseEmptyMass = 20  -- Mass when empty, In kilograms.
     CLASS.BaseCapacity  = 6.5 -- This radiator base capacity at scale 1, In liters.
 
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "RadiatorScale", {Min = 0.5, Max = 2.5, Default = 1, Decimals = 1})
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "CoolantMix",    {Min = 0, Max = 1, Default = 0.5, Decimals = 2})
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "Density",       {Min = 0, Max = 99, Default = 1, Decimals = 3})
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "SpecificHeat",  {Min = 0, Max = 9999, Default = 1, Decimals = 3})
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "BoilingPoint",  {Min = -273.15, Max = 999, Default = 100, Decimals = 2})
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "FreezingPoint", {Min = -273.15, Max = 999, Default = 0, Decimals = 2})
-
     -- Private fields, if we had the scaffolding for them..
     -- Specific Caloric Capacity of our fluids, aka how much energy they need to heat up. Higher is better.
     local WaterCp = 4186 -- In Kilojoules per Kilogram
@@ -81,59 +74,8 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
         return LUT[Count][2]
     end
 
-    function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-        local CapacityLabel
-        local MixtureLabel
-        local CoolCapLabel
-        local DensityLabel
-        local ConductLabel
-        local TmlMassLabel
-        local BoilingLabel
-        local FreezingLabel
-
-        local ScaleOpts = Classes.GetTypeFieldByName(CLASS, "RadiatorScale").Options
-        local MixOpts = Classes.GetTypeFieldByName(CLASS, "CoolantMix").Options
-
-        local function UpdateLabels()
-            -- Coolant mix as a ratio of 0 to 1, from full water to full glycol mixtures
-            local CMix = ACF.GetClientData("CoolantMix", MixOpts.Default)
-            local MisteryText
-            if CMix <= 0 then
-                MisteryText = "Pure 100% Water"
-            elseif CMix < 1 then
-                MisteryText = ("Water: %s%s, Glycol: %s%s"):format(Round(abs(1 - CMix) * 100), "%", Round(CMix * 100), "%")
-            else
-                MisteryText = "Pure 100% Glycol"
-            end
-
-            local RadScale = ACF.GetClientData("RadiatorScale", ScaleOpts.Default)
-
-            local RadiatorCapacity = CLASS.BaseCapacity * RadScale ^ 2.15
-            local CoolantCaloricCapacity = WaterCp + (GlycolCp - WaterCp) * CMix
-            local CoolantDensity = Rho_Water + (Rho_Glycol - Rho_Water) * CMix
-            local CoolantConductivity = lerp(CMix, 0.6, 0.25) -- W/(m·°C)
-            local RadiatorThermalMass = RadiatorCapacity * CoolantCaloricCapacity * CoolantDensity * 0.001
-            local BoilingPoint = LookupLerp(BoilingCurve, CMix)
-            local FreezingPoint = LookupLerp(FreezingCurve, CMix)
-
-            CapacityLabel:SetText(("Capacity: %s Liters"):format(Round(RadiatorCapacity, 1)))
-            MixtureLabel:SetText(MisteryText)
-
-            CoolCapLabel:SetText(("Specific Heat: %s kJ/kg·°C"):format(Round(CoolantCaloricCapacity, 2)))
-            ACF.SetClientData("SpecificHeat", Round(CoolantCaloricCapacity, 2))
-
-            DensityLabel:SetText(("Fluid Density: %s kg/L"):format(Round(CoolantDensity, 2)))
-            ACF.SetClientData("Density", Round(CoolantDensity, 2))
-
-            ConductLabel:SetText(("Conductivity:  %s W/m·°C"):format(Round(CoolantConductivity, 2)))
-            TmlMassLabel:SetText(("Total Thermal Mass: %s J/°C."):format(Round(RadiatorThermalMass, 2)))
-
-            BoilingLabel:SetText(("Boiling Point: %s °C"):format(Round(BoilingPoint, 2)))
-            ACF.SetClientData("BoilingPoint", Round(BoilingPoint, 2))
-
-            FreezingLabel:SetText(("Freezing Point: %s °C"):format(Round(FreezingPoint, 2)))
-            ACF.SetClientData("FreezingPoint", Round(FreezingPoint, 2))
-        end
+    function CLASS.CreateMenu(SubMenu, NestedData, Context)
+        local ClassData = Classes.GetTypeByName("acf_radiator")
 
         local BasePreview = SubMenu:AddCollapsible("Radiator Info", nil, "icon16/monitor_edit.png")
         local RadiatorName = BasePreview:AddTitle()
@@ -152,23 +94,87 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
         RadiatorPreview:UpdateModel(CLASS.Model)
         RadiatorPreview:UpdateSettings(PreviewSettings)
 
+        local CapacityLabel
+        local MixtureLabel
+        local CoolCapLabel
+        local DensityLabel
+        local ConductLabel
+        local TmlMassLabel
+        local BoilingLabel
+        local FreezingLabel
+
+        local ScaleOpts = Classes.GetTypeFieldByName(ClassData, "RadiatorScale").Options
+        local MixOpts = Classes.GetTypeFieldByName(ClassData, "CoolantMix").Options
+
+        local function UpdatePreviewSize(Scale)
+            if not IsValid(RadiatorPreview) then return end
+            RadiatorPreview:SetModelScale(Scale, true)
+        end
+
+        local function UpdateLabels()
+            -- Coolant mix as a ratio of 0 to 1, from full water to full glycol mixtures
+            local CMix = Context.Class.CoolantMix or MixOpts.Default
+            Context.Instance.CoolantMix = CMix
+
+            local MisteryText
+            if CMix <= 0 then
+                MisteryText = "Pure 100% Water"
+            elseif CMix < 1 then
+                MisteryText = ("Water: %s%s, Glycol: %s%s"):format(Round(abs(1 - CMix) * 100), "%", Round(CMix * 100), "%")
+            else
+                MisteryText = "Pure 100% Glycol"
+            end
+
+            local RadScale = Context.Class.RadiatorScale or ScaleOpts.Default
+            Context.Instance.RadiatorScale = RadScale
+
+            local RadiatorCapacity = CLASS.BaseCapacity * RadScale ^ 2.15
+            local CoolantCaloricCapacity = WaterCp + (GlycolCp - WaterCp) * CMix
+            local CoolantDensity = Rho_Water + (Rho_Glycol - Rho_Water) * CMix
+            local CoolantConductivity = lerp(CMix, 0.6, 0.25) -- W/(m·°C)
+            local RadiatorThermalMass = RadiatorCapacity * CoolantCaloricCapacity * CoolantDensity * 0.001
+            local BoilingPoint = LookupLerp(BoilingCurve, CMix)
+            local FreezingPoint = LookupLerp(FreezingCurve, CMix)
+
+            CapacityLabel:SetText(("Capacity: %s Liters"):format(Round(RadiatorCapacity, 1)))
+            MixtureLabel:SetText(MisteryText)
+
+            CoolCapLabel:SetText(("Specific Heat: %s kJ/kg·°C"):format(Round(CoolantCaloricCapacity, 2)))
+            Context.Class.SpecificHeat = CoolantCaloricCapacity
+            Context.Instance.SpecificHeat = CoolantCaloricCapacity
+
+            DensityLabel:SetText(("Fluid Density: %s kg/L"):format(Round(CoolantDensity, 2)))
+            Context.Class.Density = CoolantDensity
+            Context.Instance.Density = CoolantDensity
+
+            ConductLabel:SetText(("Conductivity:  %s W/m·°C"):format(Round(CoolantConductivity, 2)))
+            TmlMassLabel:SetText(("Total Thermal Mass: %s J/°C."):format(Round(RadiatorThermalMass, 2)))
+
+            BoilingLabel:SetText(("Boiling Point: %s °C"):format(Round(BoilingPoint, 2)))
+            Context.Class.BoilingPoint = BoilingPoint
+            Context.Instance.BoilingPoint = BoilingPoint
+
+            FreezingLabel:SetText(("Freezing Point: %s °C"):format(Round(FreezingPoint, 2)))
+            Context.Class.FreezingPoint = FreezingPoint
+            Context.Instance.FreezingPoint = FreezingPoint
+        end
+
         local ScaleSlider = BasePreview:AddSlider("Scale", ScaleOpts.Min, ScaleOpts.Max, ScaleOpts.Decimals)
-        ScaleSlider:SetValue(ACF.GetClientData("RadiatorScale", ScaleOpts.Default))
-        ScaleSlider:SetClientData("RadiatorScale", "OnValueChanged")
-        ScaleSlider:DefineSetter(function(Panel, _, _, Value)
+        ScaleSlider:SetValue(Context.Class.RadiatorScale or ScaleOpts.Default)
+        function ScaleSlider:OnValueChanged(Value)
+            Context.Class.RadiatorScale = Value
             UpdateLabels()
-            Panel:SetValue(Value)
-        end)
+            UpdatePreviewSize(Value)
+        end
 
         CapacityLabel = BasePreview:AddLabel()
 
         local CoolantMix = BasePreview:AddSlider("Coolant Mix", MixOpts.Min, MixOpts.Max, MixOpts.Decimals)
-        CoolantMix:SetValue(ACF.GetClientData("CoolantMix", MixOpts.Default))
-        CoolantMix:SetClientData("CoolantMix", "OnValueChanged")
-        CoolantMix:DefineSetter(function(Panel, _, _, Value)
+        CoolantMix:SetValue(Context.Class.CoolantMix or MixOpts.Default)
+        function CoolantMix:OnValueChanged(Value)
+            Context.Class.CoolantMix = Value
             UpdateLabels()
-            Panel:SetValue(Value)
-        end)
+        end
 
         MixtureLabel = BasePreview:AddLabel()
 
@@ -182,5 +188,6 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
         FreezingLabel   = StatsMenu:AddLabel()
 
         UpdateLabels()
+        UpdatePreviewSize(Context.Class.RadiatorScale or ScaleOpts.Default)
     end
 end)

@@ -9,7 +9,7 @@ ENT.ACF_PreventArmoring = true
 ENT.IsACFRadiator = true
 
 ACF.Entities.AutoRegisterV2(function()
-    MENU_FIELD("ACF.Radiators.BaseRadiator", "Radiator", {
+    MENU_FIELD("ACF.Radiators.BaseRadiator", "RadiatorType", {
         InstantiateTypeForDefault = "ACF.Radiators.Standard",
         OnlyAllowSubtypes = true
     })
@@ -41,5 +41,5 @@ ENT.ACF_StaticWireOutputs = {
 }
 -- Returns the radiator instance backing this entity.
 function ENT:GetRadiator()
-    return self:ACF_GetUserVar("Radiator")
+    return self:ACF_GetUserVar("RadiatorType")
 end
