@@ -1,17 +1,26 @@
-ACF.Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.BaseRadiator", function()
+local ACF = ACF
+local Classes = ACF.Classes
+
+local Round = math.Round
+
+Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.BaseRadiator", function()
     CLASS.Name        = "Block Radiator"
     CLASS.Description = "For when a standard radiator is just not enough..."
     CLASS.Model       = "models/radiators/Radiator_big.mdl"
     CLASS.IsBlock     = true -- This is a class that's sizeable on a X,Y,Z basis.
 
-    MENU_FIELD("Number", "RadiatorSizeX", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
-    MENU_FIELD("Number", "RadiatorSizeY", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
-    MENU_FIELD("Number", "RadiatorSizeZ", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
+    function CLASS.CreateMenu(SubMenu, NestedData, ContextData)
+        local ClassData = Classes.GetTypeByName("acf_radiator")
 
-    function CLASS.CreateMenu(SubMenu, NestedData, PushData)
-        local SizeXOpts = ACF.Classes.GetTypeFieldByName(CLASS, "RadiatorSizeX").Options
-        local SizeYOpts = ACF.Classes.GetTypeFieldByName(CLASS, "RadiatorSizeY").Options
-        local SizeZOpts = ACF.Classes.GetTypeFieldByName(CLASS, "RadiatorSizeZ").Options
+        local SizeXOpts = Classes.GetTypeFieldByName(ClassData, "RadiatorSizeX").Options
+        local SizeYOpts = Classes.GetTypeFieldByName(ClassData, "RadiatorSizeY").Options
+        local SizeZOpts = Classes.GetTypeFieldByName(ClassData, "RadiatorSizeZ").Options
+
+        local RadSize = Vector(
+            ContextData:Get("RadiatorSizeZ") or SizeZOpts.Default,
+            ContextData:Get("RadiatorSizeY") or SizeYOpts.Default,
+            ContextData:Get("RadiatorSizeZ") or SizeZOpts.Default
+        )
 
         local BasePreview = SubMenu:AddCollapsible("Radiator Info", nil, "icon16/monitor_edit.png")
         local RadiatorName = BasePreview:AddTitle()
@@ -28,5 +37,44 @@ ACF.Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.BaseRadiator", fun
         local RadiatorPreview = BasePreview:AddModelPreview(nil, true, "Primary")
         RadiatorPreview:UpdateModel(CLASS.Model)
         RadiatorPreview:UpdateSettings(PreviewSettings)
+
+        local function UpdatePreview()
+            if RadiatorPreview then
+                RadiatorPreview:SetModelScale(RadSize * 12)
+            end
+        end
+
+        local SizeX = BasePreview:AddSlider("Length", SizeXOpts.Min, SizeXOpts.Max)
+        SizeX:SetValue(ContextData:Get("RadiatorSizeX") or SizeXOpts.Default)
+        function SizeX:OnValueChanged(Value)
+            local X = Round(Value)
+            ContextData:Set("RadiatorSizeX", X)
+
+            RadSize.x = X
+
+            UpdatePreview()
+        end
+
+        local SizeY = BasePreview:AddSlider("Width", SizeYOpts.Min, SizeYOpts.Max)
+        SizeY:SetValue(ContextData:Get("RadiatorSizeY") or SizeYOpts.Default)
+        function SizeY:OnValueChanged(Value)
+            local Y = Round(Value)
+            ContextData:Set("RadiatorSizeY", Y)
+
+            RadSize.y = Y
+
+            UpdatePreview()
+        end
+
+        local SizeZ = BasePreview:AddSlider("Height", SizeZOpts.Min, SizeZOpts.Max)
+        SizeZ:SetValue(ContextData:Get("RadiatorSizeZ") or SizeZOpts.Default)
+        function SizeZ:OnValueChanged(Value)
+            local Z = Round(Value)
+            ContextData:Set("RadiatorSizeZ", Z)
+
+            RadSize.z = Z
+
+            UpdatePreview()
+        end
     end
 end)

@@ -20,9 +20,9 @@ ACF.Entities.AutoRegisterV2(function()
     MENU_FIELD("Number", "BoilingPoint",  {Min = -273.15, Max = 999, Default = 100, Decimals = 2})
     MENU_FIELD("Number", "FreezingPoint", {Min = -273.15, Max = 999, Default = 0, Decimals = 2})
 
-    MENU_FIELD("Number", "RadiatorSizeX", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
-    MENU_FIELD("Number", "RadiatorSizeY", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
-    MENU_FIELD("Number", "RadiatorSizeZ", {Min = ACF.ContainerMinSize or 6, Max = ACF.ContainerMaxSize or 96, Default = 24, Decimals = 0})
+    MENU_FIELD("Number", "RadiatorSizeX", {Min = 24, Max = 96, Default = 42, Decimals = 0})
+    MENU_FIELD("Number", "RadiatorSizeY", {Min = 6,  Max = 15, Default = 12, Decimals = 0})
+    MENU_FIELD("Number", "RadiatorSizeZ", {Min = 12, Max = 48, Default = 30, Decimals = 0})
 
 end, "Radiator", "Radiators")
 
