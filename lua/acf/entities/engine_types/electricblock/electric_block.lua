@@ -4,5 +4,5 @@ ACF.Classes.DefineClass("ACF.CustomEngines.ElectricBlock", "ACF.CustomEngines.Ba
     CLASS.Description = "The base class for any and all types of electric motors."
     CLASS.ToolDesc    = "Attempts to spawn the selected electric motor."
 
-    MENU_FIELD("ACF.CustomEngines.ElectricBlock", "ElectricTypes", { "GenericElectricalMotor" })
+    MENU_FIELD("ACF.CustomEngines.ElectricBlock", "EngineType", { "ACF.CustomEngines.GenericElectricalMotor" })
 end)    

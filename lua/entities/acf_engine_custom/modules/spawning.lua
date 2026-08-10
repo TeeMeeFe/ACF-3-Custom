@@ -8,7 +8,7 @@ local IsEntityValid = ACF.Optimizations.IsEntityValid
 
 local function UpdateEngine(Entity, ClassData)
 
-	PrintTable({Entity.ACF_LiveData:GetType(), ClassData, Entity})
+	-- PrintTable({Entity.ACF_LiveData:GetType(), ClassData, Entity})
 
 	Entity.ACF = Entity.ACF or {}
 
@@ -123,9 +123,7 @@ end
 
 function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
-	-- These shouldn't exist here, but the class menu stuff isn't finished yet, so we cope with this instead.
-	-- Self.ACF_LiveData simply isn't returning live, updated data values for us to feed the rest just yet. 
-
+	-- TODO: This should be either Ambient or Room Temp, depending on where you're spawning this engine.
 	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
 
 	self.ACF 				= {}
@@ -183,6 +181,7 @@ function ENT:ACF_OnUpdateEntityData()
 end
 
 function ENT:ACF_PostUpdateEntityData()
+	PrintTable({self:GetEngineType()})
 	UpdateEngine(self, self:GetEngineType())
 
 	-- A reconfigure can invalidate existing links (no-op on a fresh spawn).

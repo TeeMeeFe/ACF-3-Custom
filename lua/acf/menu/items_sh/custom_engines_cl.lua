@@ -35,7 +35,7 @@ local function Build(Menu, Contexts)
 
         if Data.CreateMenu then
             -- Equivalently ClassData.CreateMenu(ClassData, ListData, Menu, Base, UseLegacyRatios)
-            Data.CreateMenu(SubPanel, Data, Engine)
+            Data.CreateMenu(SubPanel, Data, Contexts)
         end
 
         Menu:EndTemporal(SubPanel)
@@ -49,7 +49,7 @@ ACF.Menu.RegisterPage({
     Icon     = "car_add",
     Order    = 299,
 
-    Contexts = { Engine = "acf_engine_custom" },
+    Contexts = { Engine = "acf_engine_custom", Fuel = "acf_fueltank" },
 
     -- Not yet my baby <3
     -- Actions = {
