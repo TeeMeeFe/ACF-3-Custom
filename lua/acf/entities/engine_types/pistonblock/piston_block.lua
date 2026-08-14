@@ -668,8 +668,15 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                 local ClearanceOpts = Classes.GetTypeFieldByName(SUPER, "CustomEngineClearance").Options
 
                 -- Local functions just to update our labels
-                local function UpdatePreview(Panel, Data)
-                    Panel:UpdateModel(Data)
+                local function UpdatePreview(Panel)
+                    local ClassModel = SUPER.Model
+                    local Pistons = Clamp(Engine:Get("CustomEnginePistons"), PistonOpts.Min, PistonOpts.Max)
+
+                    Engine:Set("CustomEnginePistons", Pistons)
+                    Engine:Set("CustomEngineModel", (ClassModel):format(Round(Pistons, 0)))
+
+                    local Model = Engine:Get("CustomEngineModel") or ModelOpts.Default
+                    Panel:UpdateModel(Model)
                 end
 
                 local function UpdateEngineStats(Panel, Pistons, Bore, Stroke, Clearance)
@@ -711,35 +718,31 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                 EngineStats:SetText("Engine Stats")
                 EngineDescLabel = EngineBase:AddLabel()
 
-                UpdateEngineStats(EngineDescLabel)
-                UpdatePreview(EnginePreview, Engine:Get("CustomEngineModel") or ModelOpts.Default)
-
                 local EngineConfig = SuperMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
 
                 local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
                 Pistons:SetValue(Engine:Get("CustomEnginePistons") or PistonOpts.Default)
                 function Pistons:OnValueChanged(Value)
+                    Value = Round(Value, PistonOpts.Decimals or 0)
+
                     if PistonOpts.IsEvenNumber then
                         -- Enforce even cylinder count
                         Value = max(2, (Value % 2 == 0) and Value or Value - 1)
                     end
-                    self:SetValue(Round(Value, PistonOpts.Decimals or 0))
 
-                    -- Set the engine's preview model too
-                    local ClassModel = SUPER.Model
-
-                    NestedData.CustomEngineModel = (ClassModel):format(Round(Value, PistonOpts.Decimals or 0) or ModelOpts.Default)
+                    self:SetValue(Value)
                     Engine:Set("CustomEnginePistons", Value)
-                    Engine:Set("CustomEngineModel", NestedData.CustomEngineModel)
 
-                    UpdatePreview(EnginePreview, NestedData.CustomEngineModel)
+                    UpdatePreview(EnginePreview)
                     UpdateEngineStats(EngineDescLabel, Value)
                 end
 
                 local Bore = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
                 Bore:SetValue(Engine:Get("CustomEngineBore") or BoreOpts.Default)
                 function Bore:OnValueChanged(Value)
-                    self:SetValue(Round(Value, BoreOpts.Decimals or 2))
+                    Value = Round(Value, BoreOpts.Decimals or 2)
+
+                    self:SetValue(Value)
                     Engine:Set("CustomEngineBore", Value)
 
                     UpdateEngineStats(EngineDescLabel, nil, Value)
@@ -753,14 +756,18 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                 function Clearance:OnValueChanged(Value)
                     local CorrectedCR = CLASS.ClampCR(Engine, Engine:Get("CustomEngineStroke") or Stroke:GetValue(), Value)
 
-                    self:SetValue(Round(CorrectedCR, ClearanceOpts.Decimals or 2))
+                    Value = Round(CorrectedCR, ClearanceOpts.Decimals or 2)
+
+                    self:SetValue(Value)
                     Engine:Set("CustomEngineClearance", Value)
 
                     UpdateEngineStats(EngineDescLabel, nil, nil, nil, Value)
                 end
 
                 function Stroke:OnValueChanged(Value)
-                    self:SetValue(Round(Value, StrokeOpts.Decimals or 2))
+                    Value = Round(Value, StrokeOpts.Decimals or 2)
+
+                    self:SetValue(Value)
 
                     local _, CRMin, CRMax = CLASS.ClampCR(Engine, Value, Clearance:GetValue())
                     Clearance:SetMinMax(CRMax, CRMin)
@@ -786,6 +793,9 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                         self:SetValue(Value)
                     end
                 end
+
+                UpdatePreview(EnginePreview)
+                UpdateEngineStats(EngineDescLabel)
             end
 
             function EngineClass:OnSelect(Index, _, Data)
