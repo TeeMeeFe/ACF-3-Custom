@@ -176,7 +176,7 @@ ACF.Menu.RegisterPage({
     Icon     = "car_add",
     Order    = 299,
 
-    Contexts = { Engine = "acf_engine_custom", Fuel = "acf_fueltank" },
+    Contexts = { Engine = "acf_engine_custom", Fuel = "acf_fueltank_custom" },
 
     -- Not yet my baby <3
     -- Actions = {

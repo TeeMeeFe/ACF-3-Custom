@@ -50,7 +50,12 @@ local function UpdateEngine(Entity, ClassData)
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
 	local Type = "ACF.EngineTypes.GenericPetrol" and "Petrol" or "ACF.EngineTypes.GenericDiesel" and "Diesel" or "MultiFuel"
-	local Name = ("%sL %s - %s"):format(Round(Displacement.InLiters, 1), Sign, Type)
+	local Name
+	if Displacement.InLiters <= 1 then
+		Name = ("%scc %s - %s"):format(Round(Displacement.InCubicCentimeters, 0), Sign, Type)
+	else
+		Name = ("%sL %s - %s"):format(Round(Displacement.InLiters, 1), Sign, Type)
+	end
 
 	-- Class compute table assignments
 	Entity.ACF.Model 		    = Model
