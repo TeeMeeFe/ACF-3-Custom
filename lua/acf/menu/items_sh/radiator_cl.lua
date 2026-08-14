@@ -17,8 +17,6 @@ local function Build(Menu, Context)
 
     local SubPanel = Menu:AddPanel("ACF_Panel")
 
-    ACF.Menu.LoadClassCombo(RadiatorTypeDef, Entries, "Name", nil, PAGE, "radiator")
-
     function RadiatorTypeDef:OnSelect(Index, _, Data)
         if self.Selected == Data then return end
 
@@ -38,6 +36,8 @@ local function Build(Menu, Context)
 
         Menu:EndTemporal(SubPanel)
     end
+
+    ACF.Menu.LoadClassCombo(RadiatorTypeDef, Entries, "Name", nil, PAGE, "radiator")
 end
 
 ACF.Menu.RegisterPage({

@@ -7,21 +7,18 @@ local Contraption   = ACF.Contraption
 local IsEntityValid = ACF.Optimizations.IsEntityValid
 
 local function UpdateEngine(Entity, ClassData)
-
-	-- PrintTable({Entity.ACF_LiveData:GetType(), ClassData, Entity})
-
 	Entity.ACF = Entity.ACF or {}
 
-	local Model = ClassData.CustomEngineModel
+	local Model = Entity:ACF_GetUserVar("CustomEngineModel") or ClassData.CustomEngineModel
 	Entity:SetScaledModel(Model)
 
 	local Params = {
-		Pistons    = Entity.Pistons or ClassData.CustomEnginePistons,
-		Bore	   = Entity.Bore or ClassData.CustomEngineBore,
-		Stroke 	   = Entity.Stroke or ClassData.CustomEngineStroke,
-		Clearance  = Entity.Clearance or ClassData.CustomEngineClearance,
-		BankAngle  = Entity.BankAngle or ClassData.CustomEngineBankAngle,
-		BankAmount = Entity.BankAmount or ClassData.CustomEngineBankAmount,
+		Pistons    = Entity:ACF_GetUserVar("CustomEnginePistons") or ClassData.CustomEnginePistons,
+		Bore	   = Entity:ACF_GetUserVar("CustomEngineBore") or ClassData.CustomEngineBore,
+		Stroke 	   = Entity:ACF_GetUserVar("CustomEngineStroke") or ClassData.CustomEngineStroke,
+		Clearance  = Entity:ACF_GetUserVar("CustomEngineClearance") or ClassData.CustomEngineClearance,
+		BankAngle  = Entity:ACF_GetUserVar("CustomEngineBankAngle") or ClassData.CustomEngineBankAngle,
+		BankAmount = Entity:ACF_GetUserVar("CustomEngineBankAmount") or ClassData.CustomEngineBankAmount,
 	}
 
 	local EngineClass = "ACF.EngineTypes.GenericPetrol" -- Entity.Engine.ClassData
@@ -121,7 +118,6 @@ local function UpdateEngine(Entity, ClassData)
 
 end
 
-function ENT:ACF_OnVerifyClientData(ClientData) end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	-- TODO: This should be either Ambient or Room Temp, depending on where you're spawning this engine.
 	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
@@ -180,8 +176,7 @@ function ENT:ACF_OnUpdateEntityData()
 	print("Ran ENT:ACF_OnUpdateEntityData()")
 end
 
-function ENT:ACF_PostUpdateEntityData()
-	PrintTable({self:GetEngineType()})
+function ENT:ACF_PostUpdateEntityData(ClientData)
 	UpdateEngine(self, self:GetEngineType())
 
 	-- A reconfigure can invalidate existing links (no-op on a fresh spawn).
