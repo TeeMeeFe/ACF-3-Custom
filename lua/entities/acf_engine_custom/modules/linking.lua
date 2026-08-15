@@ -6,7 +6,7 @@ local MobilityObj    = Mobility.Objects
 local MaxDistance    = ACF.MobilityLinkDistance * ACF.MobilityLinkDistance
 local MaxRadDistance = ACF.RadiatorLinkDistance * ACF.RadiatorLinkDistance
 
-ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank", function(Engine, Target)
+ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank_custom", function(Engine, Target)
     local TargetFuelType = Classes.GetTypeName(Target:ACF_GetUserVar("FuelType"):GetType())
 
     if Engine.FuelTanks[Target] then return false, "This engine is already linked to this fuel tank!" end
@@ -26,7 +26,7 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank", function(Engine, Targ
     return true, "Engine linked successfully!"
 end)
 
-ACF.RegisterClassUnlink("acf_engine_custom", "acf_fueltank", function(Engine, Target)
+ACF.RegisterClassUnlink("acf_engine_custom", "acf_fueltank_custom", function(Engine, Target)
     if Engine.FuelTanks[Target] or Target.Engines[Engine] then
         if Engine.FuelTank == Target then
             Engine.FuelTank = next(Engine.FuelTanks, Target)

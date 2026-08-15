@@ -1,5 +1,6 @@
 local ACF     		= ACF
 local Classes 		= ACF.Classes
+local GetType 		= Classes.GetTypeByName
 local Round   		= math.Round
 local max           = math.max
 local TimerRemove   = timer.Remove
@@ -21,35 +22,25 @@ local function UpdateEngine(Entity, ClassData)
 		BankAmount = Entity:ACF_GetUserVar("CustomEngineBankAmount") or ClassData.CustomEngineBankAmount,
 	}
 
-	local EngineClass = "ACF.EngineTypes.GenericPetrol" -- Entity.Engine.ClassData
-	local FuelTypes = {}
-	local ExtraEngineFields = {}
-	-- Shitty hack to get the type of fuel used for these engine Classes
-	-- This is the same hack used for the menu creation in piston_block/inline.lua
-	if EngineClass == "ACF.EngineTypes.GenericPetrol" then
-		FuelTypes = {["ACF.FuelTypes.Petrol"] = true}
-		ExtraEngineFields = {
-			PistonSpeed  = 20, -- m/s
-			Efficiency   = 0.304, -- TypeFields.Efficiency
-			TorqueScale  = 0.25, -- TypeFields.TorqueScale
-			IgnitionType = "spark"
-		}
-	elseif EngineClass == "ACF.EngineTypes.GenericDiesel" then
-		FuelTypes = {["ACF.FuelTypes.Diesel"] = true}
-		ExtraEngineFields = {
-			PistonSpeed  = 13, -- m/s
-			Efficiency   = 0.243, -- TypeFields.Efficiency
-			TorqueScale  = 0.25, -- TypeFields.TorqueScale
-			IgnitionType = "glow"
-		}
-	end
+	local EngineClass = Entity.EngineFuelType -- Entity.Engine.ClassData
+	local TypeDef     = GetType(EngineClass)
+	local FuelTypes   = GetType(EngineClass).Fuel
+
+	local ExtraEngineFields = {
+		PistonSpeed  = TypeDef.PistonSpeed,
+		Efficiency   = TypeDef.Efficiency,
+		TorqueScale  = TypeDef.TorqueScale,
+		IgnitionType = TypeDef.IgnitionType
+	}
 
 	local LayoutFactors = ClassData.GetLayoutFactors(Params.Pistons, Params.BankAngle)
 	local Compute = ClassData.Compute(_, LayoutFactors, Params, ExtraEngineFields)
 
+	PrintTable({Compute})
+
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
-	local Type = "ACF.EngineTypes.GenericPetrol" and "Petrol" or "ACF.EngineTypes.GenericDiesel" and "Diesel" or "MultiFuel"
+	local Type = TypeDef.ShortName
 	local Name
 	if Displacement.InLiters <= 1 then
 		Name = ("%scc %s - %s"):format(Round(Displacement.InCubicCentimeters, 0), Sign, Type)
@@ -60,7 +51,7 @@ local function UpdateEngine(Entity, ClassData)
 	-- Class compute table assignments
 	Entity.ACF.Model 		    = Model
 	Entity.Name      			= Name
-	Entity.ShortName 			= Name
+	Entity.ShortName 			= Type
 	Entity.BalanceFactor  		= Compute.BalanceFactor
 	Entity.BigEndDiam     		= Compute.BigEndDiam_cm
 	Entity.BlockType	 		= Compute.IsPiston and "Piston" or Compute.IsTurbine and "Turbine" or Compute.IsElectric and "Electric"
@@ -74,7 +65,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.FiringIrregularity 	= Compute.FiringIrregularity
 	Entity.FlywheelInertia 		= Compute.FlywheelInertia
 	Entity.FlyRPM				= 0
-	Entity.FuelTypes          	= FuelTypes or { ["ACF.FuelTypes.Petrol"] = true }
+	Entity.FuelTypes          	= FuelTypes or { ["ACF.CustomFuelTypes.Petrol"] = true }
 	Entity.FuelType           	= next(FuelTypes)
 	Entity.HeatCoefficient		= Compute.HeatCoeff
 	Entity.HealthMult			= 0.3
@@ -99,6 +90,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.SparksPerRev			= Compute.SparksPerRev
 	Entity.Stroke				= Compute.StrokeCm
 	Entity.SweptVolPerCyl		= Compute.SweptVolPerCyl
+	Entity.Type                 = TypeDef.Name
 	Entity.TorqueSmoothness		= Compute.TorqueSmoothness
 	Entity.TorqueCurve			= Compute.Curve
 	Entity.Torque           	= 0
@@ -130,7 +122,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.ACF 				= {}
 	self.Active        		= false
 	self.AmbientTemp        = AmbientTemperature
-	self.EngineClassType    = ClientData.BlockType.Type
+	self.EngineBlockType    = ClientData.BlockType
+	self.EngineFuelType     = ClientData.EngineType.Type
 	self.ExhaustEntity 		= nil
 	self.FuelTypes			= {}
 	self.FuelTanks     		= {}
@@ -182,7 +175,7 @@ function ENT:ACF_OnUpdateEntityData()
 end
 
 function ENT:ACF_PostUpdateEntityData(ClientData)
-	UpdateEngine(self, self:GetEngineType())
+	UpdateEngine(self, self:GetBlockType())
 
 	-- A reconfigure can invalidate existing links (no-op on a fresh spawn).
 	if next(self.Gearboxes) then

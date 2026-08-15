@@ -4,6 +4,7 @@ local GetType = Classes.GetTypeByName
 local PAGE    = "acf_engine_custom"
 
 local ENGINE_BLOCK_BASE = "ACF.CustomEngines.BaseEngineBlock"
+local ENGINE_TYPE_BASE = "ACF.CustomEngineTypes.BaseEngineType"
 
 local function Build(Menu, Contexts)
     Menu:AddTitle("Custom Engine Settings")
@@ -12,6 +13,7 @@ local function Build(Menu, Contexts)
     -- Engine "classes" are the direct children of the base engine (PistonBlock, TurbineBlock, ElectricBlock);
     -- Their items are the concrete engine types under each.
     local Entries  = Classes.GetChildren(GetType(ENGINE_BLOCK_BASE))
+    local FuelEntries = Classes.GetSubtypes(ENGINE_TYPE_BASE)
     local Engine   = Contexts.Engine
     local Fuel     = Contexts.Fuel
     local TankSize = Vector(Fuel:Get("FuelSizeX") or 24, Fuel:Get("FuelSizeY") or 24, Fuel:Get("FuelSizeZ") or 24)
@@ -20,39 +22,10 @@ local function Build(Menu, Contexts)
 
     local SubPanel = Menu:AddPanel("ACF_Panel")
 
-    function ClassList:OnSelect(Index, _, Data)
-        if self.Selected == Data then return end
-
-        self.ListData.Index = Index
-        self.Selected = Data
-
-        ACF.Menu.SaveClassCombo(PAGE, "engine", Data)
-
-        Engine:Set("BlockType", Data)
-
-        Menu:ClearTemporal(SubPanel)
-        Menu:StartTemporal(SubPanel)
-
-        local CustomMenu = Data.CreateMenu
-
-        if CustomMenu then
-            CustomMenu(SubPanel, Data, Contexts)
-        end
-
-        Menu:EndTemporal(SubPanel)
-    end
-
-    ACF.Menu.LoadClassCombo(ClassList, Entries, "Name", nil, PAGE, "engine")
-
     -- Fuel config labels and stuff 
     local FuelConfig = Menu:AddCollapsible("Fuel System Configuration", nil, "icon16/shape_square_edit.png")
     local EngineType = FuelConfig:AddComboBox()
-    EngineType:AddChoice("Diesel Engine", "ACF.EngineTypes.GenericDiesel")
-    EngineType:AddChoice("Petrol Engine", "ACF.EngineTypes.GenericPetrol")
-    EngineType:SetValue("Petrol Engine") -- Filthy fucking hack, i hate this
-    timer.Simple(0, function() if IsValid(EngineType) then EngineType:OnSelect(nil, nil, "ACF.EngineTypes.GenericPetrol") end end) -- smh
-
-    local FuelType = FuelConfig:AddComboBox()
+    local FuelType   = FuelConfig:AddComboBox()
     --=========================================================================--
     -- RIGHT BELOW THIS CODE IS MOSTLY COPIED FROM engines.lua MENU CODE       --
     --=========================================================================--
@@ -73,25 +46,61 @@ local function Build(Menu, Contexts)
     local FuelPreview = FuelBase:AddModelPreview(nil, true, "Secondary")
     local FuelInfo    = FuelBase:AddLabel()
 
-    -- We don't work with a preset list of engines, these are created on the run instead.
-    function EngineType:OnSelect(_, _, Data)
+    function ClassList:OnSelect(Index, _, Data)
         if self.Selected == Data then return end
 
+        self.ListData.Index = Index
         self.Selected = Data
 
-        local FuelData
+        ACF.Menu.SaveClassCombo(PAGE, "engineClass", Data)
+        Engine:Set("BlockType", Data)
 
-        -- Shitty hack to get the type of fuel used for these engine Classes
-        if Data == "ACF.EngineTypes.GenericPetrol" then
-            FuelData = "ACF.FuelTypes.Petrol"
-        elseif Data == "ACF.EngineTypes.GenericDiesel" then
-            FuelData = "ACF.FuelTypes.Diesel"
+        local QualifiedFuelTypes = {}
+        local ClassTypeName = Classes.GetTypeName(Data)
+
+        -- There's probably a better way to do this, but i can't lock-in rn lol
+        for K, V in pairs(FuelEntries) do
+            if ClassTypeName == "ACF.CustomEngines.PistonBlock" and not V.IsElectric and not V.IsTurbine then
+                QualifiedFuelTypes[K] = V
+            elseif ClassTypeName == "ACF.CustomEngines.ElectricBlock" and V.IsElectric then
+                QualifiedFuelTypes[K] = V
+            elseif ClassTypeName == "ACF.CustomEngines.TurbineBlock" and V.IsTurbine then
+                QualifiedFuelTypes[K] = V
+            end
         end
 
-        local FuelDescription = GetType(FuelData)
-        local Fueltank = {FuelData = FuelDescription}
+        ACF.Menu.LoadClassCombo(EngineType, QualifiedFuelTypes, "Name", nil, PAGE, "engineType")
 
-        ACF.Menu.LoadClassCombo(FuelType, Fueltank, "ID", nil, PAGE, "engine")
+        Menu:ClearTemporal(SubPanel)
+        Menu:StartTemporal(SubPanel)
+
+        local CustomMenu = Data.CreateMenu
+
+        if CustomMenu then
+            CustomMenu(SubPanel, Data, Contexts)
+        end
+
+        Menu:EndTemporal(SubPanel)
+    end
+
+    -- We don't work with a preset list of engines, these are created on the run instead.
+    function EngineType:OnSelect(Index, _, Data)
+        if self.Selected == Data then return end
+
+        self.ListData.Index = Index
+        self.Selected = Data
+
+        ACF.Menu.SaveClassCombo(PAGE, "engineType", Data)
+
+        local FuelFieldData = Classes.GetTypeFieldByName(Data, "FuelType").Options
+        local FuelData = {}
+
+        for _, V in ipairs(FuelFieldData) do
+            local FuelDescription = GetType(V)
+            FuelData[V] = FuelDescription
+        end
+
+        ACF.Menu.LoadClassCombo(FuelType, FuelData, "ID", nil, PAGE, "fuelType")
     end
 
     function FuelType:UpdateFuelText()
@@ -129,9 +138,10 @@ local function Build(Menu, Contexts)
         self.ListData.Index = Index
         self.Selected = Data
 
-        ACF.Menu.SaveClassCombo(PAGE, "fuel", Data)
+        ACF.Menu.SaveClassCombo(PAGE, "fuelType", Data)
 
         Fuel:Set("FuelType", Classes.GetTypeName(Data))
+        Engine:Set("EngineType", Classes.GetTypeName(Data))
         self:UpdateFuelText()
     end
 
@@ -167,6 +177,8 @@ local function Build(Menu, Contexts)
     SizeX:SetValue(TankSize.x)
     SizeY:SetValue(TankSize.y)
     SizeZ:SetValue(TankSize.z)
+
+    ACF.Menu.LoadClassCombo(ClassList, Entries, "Name", nil, PAGE, "engineClass")
 end
 
 ACF.Menu.RegisterPage({

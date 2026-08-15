@@ -4,7 +4,7 @@ ACF.Classes.DefineClass("ACF.CustomEngines.TurbineBlock", "ACF.CustomEngines.Bas
     CLASS.Description = "The base class for any and all types of turbines."
     CLASS.ToolDesc    = "Attempts to spawn the selected turbine."
 
-    MENU_FIELD("ACF.CustomEngines.TurbineBlock", "EngineType", {
+    MENU_FIELD("ACF.CustomEngines.BaseEngineBlock", "BlockType", {
         "ACF.CustomEngines.GasTurbine",
         "ACF.CustomEngines.GroundGasTurbine",
         "ACF.CustomEngines.PulseJet",

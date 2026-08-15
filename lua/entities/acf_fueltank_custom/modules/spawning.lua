@@ -58,7 +58,7 @@ do -- Updating
 		self:SetMaterial(TANK_MATERIAL)
 
 		local FuelID = FuelType.ID
-		-- Publish the fuel type FQN so engine links (keyed by FQN, see acf_engine) resolve.
+		-- Publish the fuel tyype FQN so engine links (keyed by FQN, see acf_engine) resolve.
 		self.FuelType    = Classes.GetTypeName(FuelType:GetType())
 		self.FuelDensity = FuelType.Density
 		self.IsExplosive = FuelType.IsExplosive
