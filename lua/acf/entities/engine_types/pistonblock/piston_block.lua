@@ -89,7 +89,7 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
     -- knock-limited (RON/octane) and much wider, but still bounded.
     local CR_BOUNDS = {
         glow  = { min = 16.0, max = 22.0 },   -- diesel: compression-ignition requirement
-        spark = { min = 7.0,  max = 13.0 },   -- petrol/other: knock-limited range
+        spark = { min = 7.0,  max = 16.0 },   -- petrol/other: knock-limited range
     }
     local CR_BOUNDS_DEFAULT = CR_BOUNDS.spark
 
@@ -627,26 +627,33 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
     -- defines them.
 
     do -- MARK: Menu code
+        local ClearancePanel -- Clearance panel, happens that we need to make this one a global
+
         -- Clamps a raw compression ratio (derived from stroke/clearance) into the realistic range
         -- for the given fuel type, and back-corrects clearance to match if clamping changed it.
-        function CLASS.ClampCR(Ctx, Stroke, Clearance)
-            local __Stroke = Stroke or Ctx:Get("CustomEngineStroke")
-            local __Clearance = Clearance or Ctx:Get("CustomEngineClearance")
-            local EngineType = Ctx:Get("EngineType") or "ACF.EngineTypes.GenericPetrol"
-            local FuelType = EngineType == "ACF.EngineTypes.GenericPetrol" and "spark" or "glow"
+        function CLASS.ClampCR(Ctx)
+            if not Ctx then return end
+            if not IsValid(ClearancePanel) then return end
 
-            local CorrectedClearance = __Clearance
+            local Stroke = Ctx:Get("CustomEngineStroke")
+            local Clearance = Ctx:Get("CustomEngineClearance")
+            local EngineData = Ctx:Get("EngineType")
+            local FuelType = EngineData.IgnitionType
+
+            local CorrectedClearance = Clearance
             local Bounds = CR_BOUNDS[FuelType] or CR_BOUNDS_DEFAULT
 
-            local CR_raw = 1 + __Stroke / __Clearance
+            local CR_raw = 1 + Stroke / Clearance
             local CR     = Clamp(CR_raw, Bounds.min, Bounds.max)
-            if CR ~= CR_raw then CorrectedClearance = __Stroke / (CR - 1) end
+            if CR ~= CR_raw then CorrectedClearance = Stroke / (CR - 1) end
 
             -- Get the clamped limits
-            local Min = __Stroke / (Bounds.min - 1)
-            local Max = __Stroke / (Bounds.max - 1)
+            local Min = Stroke / (Bounds.min - 1)
+            local Max = Stroke / (Bounds.max - 1)
 
-            return CorrectedClearance, Min, Max
+            -- Set the limits on the panel
+            ClearancePanel:SetMinMax(Max, Min)
+            ClearancePanel:SetValue(CorrectedClearance)
         end
 
         function CLASS.CreateMenu(SubMenu, NestedData, ContextData)
@@ -720,9 +727,9 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
 
                 local EngineConfig = SuperMenu:AddCollapsible("Engine Block Configuration", nil, "icon16/shape_square_edit.png")
 
-                local Pistons = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
-                Pistons:SetValue(Engine:Get("CustomEnginePistons") or PistonOpts.Default)
-                function Pistons:OnValueChanged(Value)
+                local PistonsPanel = EngineConfig:AddSlider("Number of Pistons", PistonOpts.Min, PistonOpts.Max, PistonOpts.Decimals)
+                PistonsPanel:SetValue(Engine:Get("CustomEnginePistons") or PistonOpts.Default)
+                function PistonsPanel:OnValueChanged(Value)
                     Value = Round(Value, PistonOpts.Decimals or 0)
 
                     if PistonOpts.IsEvenNumber then
@@ -737,9 +744,9 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     UpdateEngineStats(EngineDescLabel, Value)
                 end
 
-                local Bore = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
-                Bore:SetValue(Engine:Get("CustomEngineBore") or BoreOpts.Default)
-                function Bore:OnValueChanged(Value)
+                local BorePanel = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
+                BorePanel:SetValue(Engine:Get("CustomEngineBore") or BoreOpts.Default)
+                function BorePanel:OnValueChanged(Value)
                     Value = Round(Value, BoreOpts.Decimals or 2)
 
                     self:SetValue(Value)
@@ -748,15 +755,13 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     UpdateEngineStats(EngineDescLabel, nil, Value)
                 end
 
-                local Stroke = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
-                Stroke:SetValue(Engine:Get("CustomEngineStroke") or StrokeOpts.Default)
+                local StrokePanel = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
+                StrokePanel:SetValue(Engine:Get("CustomEngineStroke") or StrokeOpts.Default)
 
-                local Clearance = EngineConfig:AddSlider("Piston TDC Clearance (cm)", ClearanceOpts.Min, ClearanceOpts.Max, ClearanceOpts.Decimals)
-                Clearance:SetValue(Engine:Get("CustomEngineClearance") or ClearanceOpts.Default)
-                function Clearance:OnValueChanged(Value)
-                    local CorrectedCR = CLASS.ClampCR(Engine, Engine:Get("CustomEngineStroke") or Stroke:GetValue(), Value)
-
-                    Value = Round(CorrectedCR, ClearanceOpts.Decimals or 2)
+                ClearancePanel = EngineConfig:AddSlider("Piston TDC Clearance (cm)", ClearanceOpts.Min, ClearanceOpts.Max, ClearanceOpts.Decimals)
+                ClearancePanel:SetValue(Engine:Get("CustomEngineClearance") or ClearanceOpts.Default)
+                function ClearancePanel:OnValueChanged(Value)
+                    Value = Round(Value, ClearanceOpts.Decimals or 2)
 
                     self:SetValue(Value)
                     Engine:Set("CustomEngineClearance", Value)
@@ -764,16 +769,15 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     UpdateEngineStats(EngineDescLabel, nil, nil, nil, Value)
                 end
 
-                function Stroke:OnValueChanged(Value)
+                function StrokePanel:OnValueChanged(Value)
                     Value = Round(Value, StrokeOpts.Decimals or 2)
 
                     self:SetValue(Value)
-
-                    local _, CRMin, CRMax = CLASS.ClampCR(Engine, Value, Clearance:GetValue())
-                    Clearance:SetMinMax(CRMax, CRMin)
-
                     Engine:Set("CustomEngineStroke", Value)
+
                     UpdateEngineStats(EngineDescLabel, nil, nil, Value, nil)
+
+                    CLASS.ClampCR(Engine)
                 end
 
                 if BankAngleOpts then
@@ -804,16 +808,14 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                 self.ListData.Index = Index
                 self.Selected = Data
 
-                local TypeName = Classes.GetTypeName(EngineClass.Selected)
-
                 Engine:Set("BlockType", Data)
 
-                ACF.Menu.SaveClassCombo(PAGE, "engine", TypeName)
+                ACF.Menu.SaveClassCombo(PAGE, "engine", Data)
 
                 SubMenu:ClearTemporal(SubPanel)
                 SubMenu:StartTemporal(SubPanel)
 
-                BuildMenu(EngineClass.Selected, SubPanel)
+                BuildMenu(Data, SubPanel)
 
                 SubMenu:EndTemporal(SubPanel)
             end

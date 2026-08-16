@@ -22,7 +22,7 @@ local function UpdateEngine(Entity, ClassData)
 		BankAmount = Entity:ACF_GetUserVar("CustomEngineBankAmount") or ClassData.CustomEngineBankAmount,
 	}
 
-	local EngineClass = Entity.EngineFuelType -- Entity.Engine.ClassData
+	local EngineClass = Entity.EngineFuelType
 	local TypeDef     = GetType(EngineClass)
 	local FuelTypes   = GetType(EngineClass).Fuel
 
@@ -35,8 +35,6 @@ local function UpdateEngine(Entity, ClassData)
 
 	local LayoutFactors = ClassData.GetLayoutFactors(Params.Pistons, Params.BankAngle)
 	local Compute = ClassData.Compute(_, LayoutFactors, Params, ExtraEngineFields)
-
-	PrintTable({Compute})
 
 	local Displacement = Compute.Displacement
 	local Sign = Compute.Sign
@@ -68,7 +66,8 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.FuelTypes          	= FuelTypes or { ["ACF.CustomFuelTypes.Petrol"] = true }
 	Entity.FuelType           	= next(FuelTypes)
 	Entity.HeatCoefficient		= Compute.HeatCoeff
-	Entity.HealthMult			= 0.3
+	Entity.HealthMult			= TypeDef.HealthMult
+	Entity.ID                   = Name
 	Entity.IdleRPM				= Compute.IdleRPM
 	Entity.IsStalled			= false
 	Entity.Layout				= Compute.Layout
@@ -118,12 +117,15 @@ end
 function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	-- TODO: This should be either Ambient or Room Temp, depending on where you're spawning this engine.
 	local AmbientTemperature = ACF.AmbientTemperature - 273.15 -- In Degrees Celcius
+	-- Ugly hack just to get duplicator support in a working state :((((
+	local EngineBlockType = istable(ClientData.BlockType) and ClientData.BlockType.Type or ClientData.BlockType
+	local EngineFuelType  = istable(ClientData.EngineType) and ClientData.EngineType.Type or ClientData.EngineType
 
 	self.ACF 				= {}
 	self.Active        		= false
 	self.AmbientTemp        = AmbientTemperature
-	self.EngineBlockType    = ClientData.BlockType
-	self.EngineFuelType     = ClientData.EngineType.Type
+	self.EngineBlockType    = EngineBlockType
+	self.EngineFuelType     = EngineFuelType
 	self.ExhaustEntity 		= nil
 	self.FuelTypes			= {}
 	self.FuelTanks     		= {}
@@ -162,16 +164,12 @@ end
 
 function ENT:ACF_PostSpawn()
 	ACF.AugmentedTimer(function(cfg) self:UpdateFuelMod(cfg) end, function() return IsEntityValid(self) end, nil, {MinTime = 0.1, MaxTime = 0.25})
+	WireLib.TriggerOutput(self, "Entity", self)
 end
 
 function ENT:ACF_PreUpdateEntityData()
 	-- Don't reconfigure a running engine; shut it down first (no-op on a fresh spawn).
 	if self.Active then self:Disable() end
-end
-
-function ENT:ACF_OnUpdateEntityData()
-	--PrintTable(self.ACF_LiveData)
-	print("Ran ENT:ACF_OnUpdateEntityData()")
 end
 
 function ENT:ACF_PostUpdateEntityData(ClientData)
@@ -275,6 +273,14 @@ function ENT:PostEntityPaste(_, Ent, CreatedEntities)
 		EntMods.ACFFuelTanks = nil
 	end
 
+	if EntMods.ACFRadiators then
+		for _, EntID in ipairs(EntMods.ACFRadiators) do
+			self:Link(CreatedEntities[EntID])
+		end
+
+		EntMods.ACFRadiators = nil
+	end
+
 	-- AutoRegisterV2 wraps this as the original PostEntityPaste and handles the wire/base dupe info.
 end
 
@@ -282,7 +288,7 @@ end
 function ENT:GetCost()
 	local selftbl = self:GetTable()
 
-	return max(5, (selftbl.PeakTorque / 160) + (selftbl.PeakPower / 80))
+	return max(5, (selftbl.PeakTorque.InNm / 160) + (selftbl.PeakPower.InKW / 80))
 end
 
 -- Remove-only teardown. Captured by AutoRegisterV2 as OrigOnRemove; the generated OnRemove still

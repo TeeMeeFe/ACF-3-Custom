@@ -91,6 +91,7 @@ local function Build(Menu, Contexts)
         self.Selected = Data
 
         ACF.Menu.SaveClassCombo(PAGE, "engineType", Data)
+        Engine:Set("EngineType", Data)
 
         local FuelFieldData = Classes.GetTypeFieldByName(Data, "FuelType").Options
         local FuelData = {}
@@ -101,6 +102,13 @@ local function Build(Menu, Contexts)
         end
 
         ACF.Menu.LoadClassCombo(FuelType, FuelData, "ID", nil, PAGE, "fuelType")
+
+        -- Clamp our panel whenever we change our engine type 
+        local ClampCR = Engine:Get("BlockType").ClampCR -- :P
+
+        if ClampCR then
+            ClampCR(Engine)
+        end
     end
 
     function FuelType:UpdateFuelText()
@@ -141,7 +149,6 @@ local function Build(Menu, Contexts)
         ACF.Menu.SaveClassCombo(PAGE, "fuelType", Data)
 
         Fuel:Set("FuelType", Classes.GetTypeName(Data))
-        Engine:Set("EngineType", Classes.GetTypeName(Data))
         self:UpdateFuelText()
     end
 

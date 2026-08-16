@@ -19,7 +19,7 @@ ACF.Entities.AutoRegisterV2(function()
     })
 
     MENU_FIELD("String", "CustomEngineModel",      {Default = "models/engines/inline4s.mdl"})
-    MENU_FIELD("Number", "CustomEnginePistons",    {Min = 4,    Max = 12,  Default = 8,   Decimals = 0, IsEvenNumber = true})
+    MENU_FIELD("Number", "CustomEnginePistons",    {Min = 1,    Max = 16,  Default = 4,   Decimals = 0, IsEvenNumber = true})
     MENU_FIELD("Number", "CustomEngineBore",       {Min = 1,    Max = 20,  Default = 4.0, Decimals = 2}) -- in Centimeters
     MENU_FIELD("Number", "CustomEngineStroke",     {Min = 1,    Max = 20,  Default = 4.2, Decimals = 2}) -- in Centimeters
     MENU_FIELD("Number", "CustomEngineClearance",  {Min = 0.05, Max = 4,   Default = 0.5, Decimals = 2}) -- in Centimeters
