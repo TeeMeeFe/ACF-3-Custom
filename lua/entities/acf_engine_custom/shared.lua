@@ -8,7 +8,7 @@ ENT.ACF_PreventArmoring = true
 
 ENT.IsACFCustomEngine = true
 
-ACF.Entities.AutoRegisterV2(function()
+ACF.Entities.AutoRegisterV2(function(CLASS)
     MENU_FIELD("ACF.CustomEngines.BaseEngineBlock", "BlockType", {
         OnlyAllowSubtypes = true,
         InstantiateTypeForDefault = "ACF.CustomEngines.InlineEngine"

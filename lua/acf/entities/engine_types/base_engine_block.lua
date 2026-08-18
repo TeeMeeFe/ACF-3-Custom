@@ -23,11 +23,11 @@ local Classes = ACF.Classes
 --     └── ElectricBlock   (layout="electric")   non-piston superclass
 -- ============================================================
 
-Classes.DefineClass("ACF.CustomEngines.BaseEngineBlock", function() end)
+Classes.DefineClass("ACF.CustomEngines.BaseEngineBlock", function(CLASS) end)
 
 --- INSANE coping this is because i must really define what type of engines are we instancing, just for two fields
 -- Define the base engine type (petrol, diesel or electric) cause we need to.
-Classes.DefineClass("ACF.CustomEngineTypes.BaseEngineType", function() end)
+Classes.DefineClass("ACF.CustomEngineTypes.BaseEngineType", function(CLASS) end)
 
 -- Electric engines(copied and pasted here just for reference, this can go away in an eventual merge to the main addon)
 Classes.DefineClass("ACF.CustomEngineTypes.Electric", "ACF.CustomEngineTypes.BaseEngineType", function(CLASS)
