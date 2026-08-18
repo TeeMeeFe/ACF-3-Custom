@@ -3,7 +3,7 @@ local Classes = ACF.Classes
 
 local Round = math.Round
 
-Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.BaseRadiator", function()
+Classes.DefineClass("ACF.Radiators.Block", "ACF.Radiators.BaseRadiator", function(CLASS)
     CLASS.Name        = "Block Radiator"
     CLASS.Description = "For when a standard radiator is just not enough..."
     CLASS.Model       = "models/radiators/Radiator_big.mdl"

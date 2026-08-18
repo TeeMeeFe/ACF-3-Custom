@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.CustomFuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.FuelType", function(CLASS)
     CLASS.ID          = "FuelType"
     CLASS.Name        = "Fuel Type"
     CLASS.Density     = 0.832 -- kg per liter (or kg per kWh for electric)

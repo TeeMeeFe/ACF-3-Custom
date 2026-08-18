@@ -46,7 +46,7 @@ local PAGE    = "acf_engine_custom"
 -- ===========================================================================
 
 -- MARK: Class definition
-Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngineBlock", function()
+Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngineBlock", function(CLASS)
     CLASS.Name          = "Piston Block Class"
     CLASS.Description   = "The base class for any and all piston engines."
     CLASS.ToolDesc      = "Attempts to spawn the selected piston engine."

@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.CustomFuelTypes.Lithium", "ACF.CustomFuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.Lithium", "ACF.CustomFuelTypes.FuelType", function(CLASS)
     CLASS.ID         = "Lithium"
     CLASS.ShortName  = "Electric"
     CLASS.Name       = "Lit-Ion Battery"

@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.CustomFuelTypes.Petrol", "ACF.CustomFuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.Petrol", "ACF.CustomFuelTypes.FuelType", function(CLASS)
     CLASS.Name         = "Petrol Fuel"
     CLASS.ShortName    = "Petrol"
     CLASS.ID           = "Petrol"

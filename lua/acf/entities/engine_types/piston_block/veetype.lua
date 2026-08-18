@@ -5,7 +5,7 @@ local abs     = math.abs
 local max     = math.max
 local Clamp   = math.Clamp
 
-Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBlock", function()
+Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBlock", function(CLASS, BASE)
     CLASS.Name                 = "V-Type Engine"
     CLASS.Description          = "A piston engine in a V configuration"
     CLASS.Model                = "models/engines/v%ss.mdl"
@@ -72,7 +72,6 @@ Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBl
     end
 
     function CLASS.Compute(_, Layout, Params, ...)
-        local BASE = BASE
         local Args = unpack({...}) -- Unpack any extra args and store them here
 
         -- Append the layout, sign fields and the rest of the args

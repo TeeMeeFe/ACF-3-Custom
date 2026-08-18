@@ -1,7 +1,7 @@
 local ACF         = ACF
 local Classes     = ACF.Classes
 
-Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonBlock", function()
+Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonBlock", function(CLASS, BASE)
     CLASS.Name                 = "Inline Engine"
     CLASS.Description          = "A piston engine in a inlined configuration"
     CLASS.Model                = "models/engines/inline%ss.mdl"
@@ -40,7 +40,6 @@ Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonB
     end
 
     function CLASS.Compute(_, Layout, Params, ...)
-        local BASE = BASE
         local Args = unpack({...}) -- Unpack any extra args and store them here
 
         -- Append the layout, sign fields and the rest of the args

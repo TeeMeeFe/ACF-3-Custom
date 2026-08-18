@@ -30,7 +30,7 @@ Classes.DefineClass("ACF.CustomEngines.BaseEngineBlock", function() end)
 Classes.DefineClass("ACF.CustomEngineTypes.BaseEngineType", function() end)
 
 -- Electric engines(copied and pasted here just for reference, this can go away in an eventual merge to the main addon)
-Classes.DefineClass("ACF.CustomEngineTypes.Electric", "ACF.CustomEngineTypes.BaseEngineType", function()
+Classes.DefineClass("ACF.CustomEngineTypes.Electric", "ACF.CustomEngineTypes.BaseEngineType", function(CLASS)
     CLASS.Name        = "Generic Electric Engine"
     CLASS.ShortName   = "Electric"
     CLASS.Efficiency  = 0.85 --percent efficiency converting chemical kw into mechanical kw
@@ -50,7 +50,7 @@ end)
 
 -- Diesel engines
 -- Efficiency and torqueCurve are defined by the fuel type classes
-Classes.DefineClass("ACF.CustomEngineTypes.GenericDiesel", "ACF.CustomEngineTypes.BaseEngineType", function()
+Classes.DefineClass("ACF.CustomEngineTypes.GenericDiesel", "ACF.CustomEngineTypes.BaseEngineType", function(CLASS)
     CLASS.Name         = "Generic Diesel Engine"
     CLASS.ShortName    = "Diesel"
     CLASS.TorqueScale  = 0.25
@@ -64,7 +64,7 @@ Classes.DefineClass("ACF.CustomEngineTypes.GenericDiesel", "ACF.CustomEngineType
 end)
 
 -- Any Petrol engines
-Classes.DefineClass("ACF.CustomEngineTypes.GenericPetrol", "ACF.CustomEngineTypes.BaseEngineType", function()
+Classes.DefineClass("ACF.CustomEngineTypes.GenericPetrol", "ACF.CustomEngineTypes.BaseEngineType", function(CLASS)
     CLASS.Name         = "Generic Petrol Engine"
     CLASS.ShortName    = "Petrol"
     CLASS.TorqueScale  = 0.25
@@ -86,7 +86,7 @@ Classes.DefineClass("ACF.CustomEngineTypes.GenericPetrol", "ACF.CustomEngineType
 end)
 
 -- Any turbines
-Classes.DefineClass("ACF.CustomEngineTypes.Turbine", "ACF.CustomEngineTypes.BaseEngineType", function()
+Classes.DefineClass("ACF.CustomEngineTypes.Turbine", "ACF.CustomEngineTypes.BaseEngineType", function(CLASS)
     CLASS.Name         = "Generic Turbine"
     CLASS.ShortName    = "Turbine"
     CLASS.Efficiency   = 0.375 -- previously 0.231

@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.CustomFuelTypes.E85", "ACF.CustomFuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.E85", "ACF.CustomFuelTypes.FuelType", function(CLASS)
     CLASS.Name         = "Ethanol 85 Fuel"
     CLASS.ShortName    = "E85"
     CLASS.ID           = "Ethanol 85"

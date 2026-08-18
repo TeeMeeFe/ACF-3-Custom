@@ -5,7 +5,7 @@ local lerp  = Lerp
 local abs   = math.abs
 local Round = math.Round
 
-Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", function()
+Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", function(CLASS)
     CLASS.Name = "Standard Radiator"
     CLASS.Description = "A radiator for cooling down any Naturally Aspirated engines."
     CLASS.Model = "models/radiators/Radiator_med.mdl"

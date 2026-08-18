@@ -1,4 +1,4 @@
-ACF.Classes.DefineClass("ACF.CustomFuelTypes.JetFuel", "ACF.CustomFuelTypes.FuelType", function()
+ACF.Classes.DefineClass("ACF.CustomFuelTypes.JetFuel", "ACF.CustomFuelTypes.FuelType", function(CLASS)
     CLASS.Name         = "Jet Fuel"
     CLASS.ShortName    = "JetFuel"
     CLASS.ID           = "Jet"
