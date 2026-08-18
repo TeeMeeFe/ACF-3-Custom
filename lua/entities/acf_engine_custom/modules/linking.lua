@@ -46,7 +46,7 @@ ACF.RegisterClassUnlink("acf_engine_custom", "acf_fueltank_custom", function(Eng
     return false, "This engine is not linked to this fuel tank."
 end)
 
-ACF.RegisterClassLink("acf_engine_custom", "acf_gearbox", function(Engine, Target)
+ACF.RegisterClassLink("acf_engine_custom", "acf_gearbox_custom", function(Engine, Target)
     if Engine.Gearboxes[Target] then return false, "This engine is already linked to this gearbox." end
     if Engine:GetPos():DistToSqr(Target:GetPos()) > MaxDistance then return false, "This gearbox is too far away from this engine!" end
 
@@ -77,7 +77,7 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_gearbox", function(Engine, Targe
     return true, "Engine linked successfully!"
 end)
 
-ACF.RegisterClassUnlink("acf_engine_custom", "acf_gearbox", function(Engine, Target)
+ACF.RegisterClassUnlink("acf_engine_custom", "acf_gearbox_custom", function(Engine, Target)
     if not Engine.Gearboxes[Target] then
         return false, "This engine is not linked to this gearbox."
     end
