@@ -279,7 +279,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 end
 
 function ENT.ACF_CheckSpawnLimit(Player)
-    return Player:CheckLimit("_acf_gearbox")
+    return Player:CheckLimit("_acf_gearbox_custom")
 end
 
 -- Runs before each reconfigure (and is fired by the framework before deserialize, while the OLD

@@ -1,5 +1,10 @@
 DEFINE_BASECLASS("acf_base_scalable")
 
+ENT.ACF_Limit = 20
+ENT.ACF_PreventArmoring = true
+
+ENT.IsACFCustomGearbox = true
+
 ACF.Entities.AutoRegisterV2(function()
 	-- The gearbox variant this entity represents (e.g. ACF.Gearboxes.Manual-T).
 	MENU_FIELD("ACF.Gearboxes.BaseGearbox", "Gearbox", {OnlyAllowSubtypes = true, InstantiateTypeForDefault = "ACF.Gearboxes.2Gear-T"})
