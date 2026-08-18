@@ -167,6 +167,8 @@ end
 --===============================================================================================--
 
 do -- Actual engine rpm and torque calculations
+    function ENT:GetTorqueMult() return ACF.GetServerData("TorqueMult") or 1 end
+
     function ENT:GetConsumption(Throttle, RPM, FuelTank, SelfTbl)
         SelfTbl = SelfTbl or ENTITY.GetTable(self)
         FuelTank = FuelTank or SelfTbl.FuelTank
@@ -223,6 +225,7 @@ do -- Actual engine rpm and torque calculations
         local ClockTime  = Clock.CurTime
         local DeltaTime  = ClockTime - SelfTbl.LastThink
         local FuelTank   = GetNextFuelTank(SelfTbl)
+        local TorqueMult = SelfTbl.GetTorqueMult() -- Idk if this will work given the tight perf budget we have to work with here...
         local IsElectric = SelfTbl.IsElectric
         local LimitRPM   = SelfTbl.LimitRPM
         local RedlineRPM = SelfTbl.RedlineRPM
@@ -267,22 +270,16 @@ do -- Actual engine rpm and torque calculations
         local PeakTorque = SelfTbl.PeakTorque.InNm
         local Drag       = (PeakTorque * (max(FlyRPM - IdleRPM, 0) / PeakRPM) * (1 - Throttle)) / Inertia
 
-        -- This is just to update the overlay
-        -- Here ideally i'd also check if the starter is engaged and update that condition as well.
-        -- This way of setting states is performance wasteful though...
-        if FlyRPM < IdleRPM then
-            SelfTbl.State = "Stalling"
-        else
-            SelfTbl.State = "Active"
-        end
-
         -- if Throttle ~= 0 and FlyRPM < LimitRPM then
         if FlyRPM < LimitRPM then
             local Sample = SelfTbl.Sample(FlyRPM)
-            Torque = Throttle * Sample[1]
+            Torque = Throttle * Sample[1] * TorqueMult
             Friction = Sample[2]
         end
 
+        -- This is just to update the overlay
+        -- Here ideally i'd also check if the starter is engaged and update that condition as well.
+        SelfTbl.State = FlyRPM < IdleRPM and "Stalling" or "Active"
         SelfTbl.Torque = Torque
         SelfTbl.Friction = Friction -- Assembly Friction
 
