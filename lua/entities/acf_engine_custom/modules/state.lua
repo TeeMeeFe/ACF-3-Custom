@@ -17,6 +17,7 @@ local UnlinkGbxSound = "physics/metal/metal_box_impact_bullet%s.wav"
 local IsValid        = IsValid
 local Clamp          = math.Clamp
 local Round          = math.Round
+local PI             = math.pi
 local abs            = math.abs
 local random         = math.random
 local max            = math.max
@@ -318,18 +319,22 @@ do -- Actual engine rpm and torque calculations
             GearboxTotalRatio = GearboxTotalRatio / GearboxCount
         end
 
+        -- Pumping/compression braking
+        local PMEP = 25 -- bar; Tune this bitch 
+        local CompressionBrakeTorque = -(PMEP * SelfTbl.Displacement.InLiters / (4 * PI)) * SelfTbl.CompressionRatio * (1 - Throttle)
+
         local SlipDifference = GearboxRPM - FlyRPM
         local MaxTq = (abs(SlipDifference) * GearboxInertia) / max(GearboxTotalRatio, 0.001)
-        local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) / 2, -MaxTq, MaxTq)
+        -- local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) / 2, -MaxTq, MaxTq)
+        local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = max(FlyInertia, GearboxInertia * GearboxLoad)
-        local CompressionBrakeTorque = -((SelfTbl.CompressionRatio * 0.01) * (FlyRPM * ACF.RPMToRads) * (1 - Throttle)) * 0.005
-        local Drag = (PeakTorque * (max(FlyRPM, 0) / PeakRPM) * (1 - Throttle)) / IncomingInertia
+        -- local CompressionBrakeTorque = -((SelfTbl.CompressionRatio * 0.01) * (FlyRPM * ACF.RPMToRads) * (1 - Throttle)) * 0.005
+        local Drag = (PeakTorque * (max(FlyRPM - IdleRPM, 0) / PeakRPM) * (1 - Throttle)) / FlyInertia
 
         Torque = Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * (1 - GearboxLoad))
 
-        -- Let's accelerate the flywheel based on that torque, up to the engine's mechanical limit.
+        -- Let's accelerate the flywheel based on that torque
         FlyRPM = max(FlyRPM + Torque / IncomingInertia - Drag, 0)
-        -- FlyRPM = min(max(FlyRPM + Torque / IncomingInertia - Drag, 0), LimitRPM)
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.

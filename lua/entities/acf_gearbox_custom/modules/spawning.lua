@@ -327,7 +327,6 @@ function ENT:ACF_PostSpawn()
             timer.Remove("ACF Gearbox Clock " .. self:EntIndex())
         end
     end)
-    WireLib.TriggerOutput(self, "Entity", self)
 end
 
 ACF.RegisterLinkSource("acf_gearbox_custom", "GearboxIn")

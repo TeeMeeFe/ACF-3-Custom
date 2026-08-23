@@ -144,7 +144,7 @@ do -- Movement -----------------------------------------
     end
 
     function ENT:Calc(InputRPM, InputInertia)
-        local SelfTbl = self:GetTable()
+        local SelfTbl = ENTITY.GetTable(self)
         if SelfTbl.Disabled then return 0 end
 
         local Now = Clock.CurTime
@@ -281,7 +281,6 @@ do -- Movement -----------------------------------------
             if GearRatio ~= 0 then
                 local WheelRPM = CalcWheel(self, Link, Wheel, ChassisAV)
                 local Clutch = Link.Side == 0 and LClutch or RClutch
-                -- local OnRPM = ((InputRPM > 0 and WheelRPM < InputRPM) or (InputRPM < 0 and WheelRPM > InputRPM))
 
                 if Clutch > 0 then
                     local Multiplier = 1
@@ -292,12 +291,16 @@ do -- Movement -----------------------------------------
                         Multiplier = Link.Side == 0 and LMult or RMult
                     end
 
+                    -- TODO: Right here is where the we'd do engine braking, but for some reason, the negative required torque ends up becoming really high.
+                    -- So we have to clamp it to some arbitrary value while i figure out a way to properly fix engine braking with proper rev-matching...
+                    -- In other words: It doesn't spazz but it ends up being a really effective brake, so much so that the wheels are rev-matching the engine
+                    -- and not the other way around lmao.
                     local Target = InputRPM * Multiplier
+                    local ReqTq = (Target - WheelRPM) * InputInertia * Clutch
 
-                    -- if abs(Target) > abs(WheelRPM) then -- removing this check causes the wheels to constantly invert their rotation
-                        Link.ReqTq = (Target - WheelRPM) * InputInertia * Clutch
-                        TotalReqTq = TotalReqTq + Link.ReqTq
-                    -- end
+                    -- Link.ReqTq = max((Target - WheelRPM) * InputInertia * Clutch, -ScaledInertia) -- Boomer
+                    Link.ReqTq = max(ReqTq, -abs(ReqTq) * 0.05) -- Boomer twice, 0.05 is a magic number
+                    TotalReqTq = TotalReqTq + Link.ReqTq
                 end
 
                 MeasuredRPMSum = MeasuredRPMSum + WheelRPM
@@ -346,7 +349,6 @@ do -- Movement -----------------------------------------
         local GearRatio  = SelfTbl.GearRatio
         local TotalReqTq = SelfTbl.TotalReqTq
 
-        -- if GearRatio == 0 or TotalReqTq <= 0 then return end
         if GearRatio == 0 then return end
 
         -- Internal torque loss from damage
@@ -421,7 +423,9 @@ do -- Movement -----------------------------------------
             return
         end
 
+        -- Multiple engines: Accumulates their torque and then distribute
         local Now = Clock.CurTime
+
         if SelfTbl.ActTick ~= Now then
             SelfTbl.ActTick        = Now
             SelfTbl.AccumTorque    = 0

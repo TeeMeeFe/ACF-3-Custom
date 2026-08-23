@@ -57,7 +57,6 @@ do -- Spawning
         self.Temperature = self.AmbTemp
 
         self:SetScale(self.ACF.Scale)
-        WireLib.TriggerOutput(self, "Entity", self)
         WireLib.TriggerOutput(self, "Temperature", self.Temperature)
     end
 end

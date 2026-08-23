@@ -166,7 +166,6 @@ end
 
 function ENT:ACF_PostSpawn()
 	ACF.AugmentedTimer(function(cfg) self:UpdateFuelMod(cfg) end, function() return IsEntityValid(self) end, nil, {MinTime = 0.1, MaxTime = 0.25})
-	WireLib.TriggerOutput(self, "Entity", self)
 end
 
 function ENT:ACF_PreUpdateEntityData()
