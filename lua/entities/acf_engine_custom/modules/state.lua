@@ -17,6 +17,7 @@ local UnlinkGbxSound = "physics/metal/metal_box_impact_bullet%s.wav"
 local IsValid        = IsValid
 local Clamp          = math.Clamp
 local Round          = math.Round
+local abs            = math.abs
 local random         = math.random
 local max            = math.max
 local min            = math.min
@@ -227,6 +228,7 @@ do -- Actual engine rpm and torque calculations
         local FuelTank   = GetNextFuelTank(SelfTbl)
         local TorqueMult = SelfTbl.GetTorqueMult() -- Idk if this will work given the tight perf budget we have to work with here...
         local IsElectric = SelfTbl.IsElectric
+        local IdleRPM    = SelfTbl.IdleRPM
         local LimitRPM   = SelfTbl.LimitRPM
         local RedlineRPM = SelfTbl.RedlineRPM
         local FlyRPM     = SelfTbl.FlyRPM
@@ -242,7 +244,16 @@ do -- Actual engine rpm and torque calculations
 
             SelfTbl.RevLimited = RevLimited
         end
-        local Throttle = RevLimited and 0 or SelfTbl.Throttle
+
+        -- Throttle Idler code shamefully stolen from Tyunge's engine rework.
+        local IdleRatio = (IdleRPM - FlyRPM) / IdleRPM
+        SelfTbl.IdleThrottle = Clamp(SelfTbl.IdleThrottle + (IdleRatio * 0.25), 0, 1)
+
+        local SmoothedIdle = SelfTbl.IdleThrottle - SelfTbl.LastIdleThrottle
+        SelfTbl.LastIdleThrottle = SelfTbl.IdleThrottle
+
+        -- local Throttle = RevLimited and 0 or SelfTbl.Throttle
+        local Throttle = RevLimited and 0 or Clamp(SelfTbl.Throttle + (SelfTbl.IdleThrottle + SmoothedIdle * 5), 0, 1)
 
         -- Calculate fuel usage
         if IsEntityValid(FuelTank) then
@@ -264,18 +275,61 @@ do -- Actual engine rpm and torque calculations
         -- Calculate the current torque from flywheel RPM
         local Torque, Friction = 0, SelfTbl.Friction or 0
 
-        local IdleRPM    = SelfTbl.IdleRPM
         local PeakRPM    = IsElectric and SelfTbl.FlywheelOverride or SelfTbl.PowerBand.Max
-        local Inertia    = SelfTbl.FlywheelInertia
+        local FlyInertia = SelfTbl.FlywheelInertia
         local PeakTorque = SelfTbl.PeakTorque.InNm
-        local Drag       = (PeakTorque * (max(FlyRPM - IdleRPM, 0) / PeakRPM) * (1 - Throttle)) / Inertia
 
         -- if Throttle ~= 0 and FlyRPM < LimitRPM then
         if FlyRPM < LimitRPM then
             local Sample = SelfTbl.Sample(FlyRPM)
             Torque = Throttle * Sample[1] * TorqueMult
             Friction = Sample[2]
+        else
+            Torque = 0
         end
+
+        -- The gearboxes don't think on their own, it's the engine that calls them, to ensure consistent execution order
+        local GearboxCount      = 0
+        local GearboxLoad       = 0
+        local GearboxRPM        = 0
+        local GearboxInertia    = 0
+        local GearboxTotalRatio = 0
+
+        local BoxesTbl = SelfTbl.Gearboxes
+        local TotalReqTq = 0
+        -- Get the requirements for torque for the gearboxes (Max clutch rating minus any wheels currently spinning faster than the Flywheel)
+        for Ent, Link in pairs(BoxesTbl) do
+            local EntTbl = ENTITY.GetTable(Ent)
+
+            if not EntTbl.Disabled then
+                Link.ReqTq = EntTbl.Calc(Ent, FlyRPM, FlyInertia)
+                TotalReqTq = TotalReqTq + Link.ReqTq
+
+                GearboxCount      = GearboxCount + 1
+                GearboxLoad       = GearboxLoad + (EntTbl.Load or 0)
+                GearboxTotalRatio = GearboxTotalRatio + (EntTbl.TotalRatio or 0)
+                GearboxRPM        = GearboxRPM + (EntTbl.MeasuredRPM or FlyRPM)
+                GearboxInertia    = GearboxInertia + (EntTbl.DownstreamInertia or 0)
+            end
+        end
+
+        if GearboxCount > 0 then
+            GearboxRPM = GearboxRPM / GearboxCount
+            GearboxTotalRatio = GearboxTotalRatio / GearboxCount
+        end
+
+        local SlipDifference = GearboxRPM - FlyRPM
+        local MaxTq = (abs(SlipDifference) * GearboxInertia) / max(GearboxTotalRatio, 0.001)
+        local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) / 2, -MaxTq, MaxTq)
+        local IncomingInertia = max(FlyInertia, GearboxInertia * GearboxLoad)
+        local CompressionBrakeTorque = -((SelfTbl.CompressionRatio * 0.01) * (FlyRPM * ACF.RPMToRads) * (1 - Throttle)) * 0.005
+        local Drag = (PeakTorque * (max(FlyRPM, 0) / PeakRPM) * (1 - Throttle)) / IncomingInertia
+
+        Torque = Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * (1 - GearboxLoad))
+
+        -- Let's accelerate the flywheel based on that torque, up to the engine's mechanical limit.
+        FlyRPM = max(FlyRPM + Torque / IncomingInertia - Drag, 0)
+        -- FlyRPM = min(max(FlyRPM + Torque / IncomingInertia - Drag, 0), LimitRPM)
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
@@ -283,59 +337,27 @@ do -- Actual engine rpm and torque calculations
         SelfTbl.Torque = Torque
         SelfTbl.Friction = Friction -- Assembly Friction
 
-        -- Let's accelerate the flywheel based on that torque, up to the engine's mechanical limit.
-        FlyRPM = min(max(FlyRPM + Torque / Inertia - Drag, 0), LimitRPM)
-
-        -- The gearboxes don't think on their own, it's the engine that calls them, to ensure consistent execution order
-        local Boxes      = 0
-        local TotalReqTq = 0
-        local SlipDrain  = 0 -- RPM drain from clutch slip (per-gearbox, accumulated below)
-
         -- This is the presently available torque from the engine
-        local TorqueDiff = max(FlyRPM - IdleRPM, 0) * Inertia
+        -- local TorqueDiff = max(FlyRPM - IdleRPM, 0) * IncomingInertia
+        local TorqueDiff = Clamp(FlyRPM - IdleRPM, -TotalReqTq, TotalReqTq) * IncomingInertia
 
-        -- The resulting torque output would be 0 when there's no throttle anyways, so we'll just skip the calculations entirely
-        if Throttle ~= 0 then
-            local BoxesTbl = SelfTbl.Gearboxes
+        -- Calculate the ratio of total requested torque versus what's available
+        -- local AvailRatio = min(TorqueDiff / TotalReqTq, 1)
+        local AvailRatio = min(abs(TorqueDiff) / max(abs(TotalReqTq), 1e-6), 1)
 
-            -- Get the requirements for torque for the gearboxes (Max clutch rating minus any wheels currently spinning faster than the Flywheel)
-            for Ent, Link in pairs(BoxesTbl) do
-                local EntTable = ENTITY.GetTable(Ent)
-                if not EntTable.Disabled then
-                    Boxes = Boxes + 1
-                    Link.ReqTq = EntTable.Calc(Ent, FlyRPM, Inertia)
-                    TotalReqTq = TotalReqTq + Link.ReqTq
+        local MassRatio = SelfTbl.MassRatio
 
-                    -- Slip coupling: flywheel RPM vs load-side RPM at each gearbox input shaft.
-                    -- When FlyRPM > LoadSideRPM the clutch drags the flywheel down toward the load.
-                    -- When FlyRPM < LoadSideRPM (overrun) the load pushes the flywheel up.
-                    -- Engagement strength is the average of left/right clutch values (0 = open, 1 = locked).
-                    local SlipRPM = FlyRPM - (EntTable.LoadSideRPM or FlyRPM)
-                    local Engage  = (EntTable.LClutch + EntTable.RClutch) * 0.5
-                    SlipDrain = SlipDrain + SlipRPM * Engage * ACF.ClutchSlipCoef
-                end
-            end
-
-            -- Clamp total slip so a single tick can't drain more than the available flywheel energy.
-            SlipDrain = Clamp(SlipDrain, -TorqueDiff, TorqueDiff) / Inertia
-
-            -- Calculate the ratio of total requested torque versus what's available
-            local AvailRatio = min(TorqueDiff / TotalReqTq / Boxes, 1)
-
-            local MassRatio = SelfTbl.MassRatio
-
-            -- Split the torque fairly between the gearboxes who need it
-            for Ent, Link in pairs(BoxesTbl) do
-                Link:TransferGearbox(Ent, Link.ReqTq * AvailRatio * MassRatio, DeltaTime, MassRatio, FlyRPM)
-                --Ent:Act(Link.ReqTq * AvailRatio * MassRatio, DeltaTime, MassRatio)
-            end
+        -- Split the torque fairly between the gearboxes who need it
+        for Ent, Link in pairs(BoxesTbl) do
+            Link:TransferGearbox(Ent, Link.ReqTq * AvailRatio * MassRatio, DeltaTime, MassRatio, FlyRPM)
         end
 
-        SelfTbl.FlyRPM = FlyRPM - min(TorqueDiff, TotalReqTq) / Inertia - SlipDrain
+        -- SelfTbl.FlyRPM = FlyRPM - min(TorqueDiff, TotalReqTq) / IncomingInertia
+        SelfTbl.FlyRPM = FlyRPM
 
         -- Stall detection: RPM collapsed below the stall threshold while the load exceeded output.
         -- SetActive handles the restart guard; CalcRPM just flags and shuts down.
-        if SelfTbl.FlyRPM <= SelfTbl.IdleRPM * 0.1 and TotalReqTq > TorqueDiff then
+        if FlyRPM <= IdleRPM * 0.5 and TotalReqTq > TorqueDiff then
             SelfTbl.IsStalled = true
             SetActive(self, false, SelfTbl)
         end

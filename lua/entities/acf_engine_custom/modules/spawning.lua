@@ -146,6 +146,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.FuelUsage     		= 0
 	self.Layout 	   		= ""
 	self.Throttle 	   		= 0
+	self.IdleThrottle	    = 0
+	self.LastIdleThrottle   = 0
 	self.IsStalled		    = false
 	self.State         		= "Idle"
 	self.SoundBanks    		= {}
