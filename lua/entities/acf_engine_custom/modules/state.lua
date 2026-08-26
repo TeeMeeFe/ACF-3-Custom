@@ -276,9 +276,9 @@ do -- Actual engine rpm and torque calculations
         -- Calculate the current torque from flywheel RPM
         local Torque, Friction = 0, SelfTbl.Friction or 0
 
-        local PeakRPM    = IsElectric and SelfTbl.FlywheelOverride or SelfTbl.PowerBand.Max
+        -- local PeakRPM    = IsElectric and SelfTbl.FlywheelOverride or SelfTbl.PowerBand.Max
         local FlyInertia = SelfTbl.FlywheelInertia
-        local PeakTorque = SelfTbl.PeakTorque.InNm
+        -- local PeakTorque = SelfTbl.PeakTorque.InNm
 
         -- if Throttle ~= 0 and FlyRPM < LimitRPM then
         if FlyRPM < LimitRPM then
@@ -325,16 +325,13 @@ do -- Actual engine rpm and torque calculations
 
         local SlipDifference = GearboxRPM - FlyRPM
         local MaxTq = (abs(SlipDifference) * GearboxInertia) / max(GearboxTotalRatio, 0.001)
-        -- local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) / 2, -MaxTq, MaxTq)
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = max(FlyInertia, GearboxInertia * GearboxLoad)
-        -- local CompressionBrakeTorque = -((SelfTbl.CompressionRatio * 0.01) * (FlyRPM * ACF.RPMToRads) * (1 - Throttle)) * 0.005
-        local Drag = (PeakTorque * (max(FlyRPM - IdleRPM, 0) / PeakRPM) * (1 - Throttle)) / FlyInertia
 
-        Torque = Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * (1 - GearboxLoad))
+        Torque = (Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * (1 - GearboxLoad))) - Friction
 
         -- Let's accelerate the flywheel based on that torque
-        FlyRPM = max(FlyRPM + Torque / IncomingInertia - Drag, 0)
+        FlyRPM = max(FlyRPM + Torque / IncomingInertia - Friction, 0)
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
@@ -343,11 +340,9 @@ do -- Actual engine rpm and torque calculations
         SelfTbl.Friction = Friction -- Assembly Friction
 
         -- This is the presently available torque from the engine
-        -- local TorqueDiff = max(FlyRPM - IdleRPM, 0) * IncomingInertia
         local TorqueDiff = Clamp(FlyRPM - IdleRPM, -TotalReqTq, TotalReqTq) * IncomingInertia
 
         -- Calculate the ratio of total requested torque versus what's available
-        -- local AvailRatio = min(TorqueDiff / TotalReqTq, 1)
         local AvailRatio = min(abs(TorqueDiff) / max(abs(TotalReqTq), 1e-6), 1)
 
         local MassRatio = SelfTbl.MassRatio
@@ -362,7 +357,7 @@ do -- Actual engine rpm and torque calculations
 
         -- Stall detection: RPM collapsed below the stall threshold while the load exceeded output.
         -- SetActive handles the restart guard; CalcRPM just flags and shuts down.
-        if FlyRPM <= IdleRPM * 0.5 and TotalReqTq > TorqueDiff then
+        if FlyRPM <= IdleRPM * 0.33 and GearboxTotalRatio == 0 or (FlyRPM <= IdleRPM * 0.33 and TotalReqTq > TorqueDiff) then
             SelfTbl.IsStalled = true
             SetActive(self, false, SelfTbl)
         end

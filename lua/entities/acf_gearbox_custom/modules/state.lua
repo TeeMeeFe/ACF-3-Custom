@@ -282,7 +282,7 @@ do -- Movement -----------------------------------------
                 local WheelRPM = CalcWheel(self, Link, Wheel, ChassisAV)
                 local Clutch = Link.Side == 0 and LClutch or RClutch
 
-                if Clutch > 0 then
+                if SelfTbl.InGear and Clutch > 0 then
                     local Multiplier = 1
 
                     if DoubleDiff and SteerRate ~= 0 then
@@ -291,15 +291,10 @@ do -- Movement -----------------------------------------
                         Multiplier = Link.Side == 0 and LMult or RMult
                     end
 
-                    -- TODO: Right here is where the we'd do engine braking, but for some reason, the negative required torque ends up becoming really high.
-                    -- So we have to clamp it to some arbitrary value while i figure out a way to properly fix engine braking with proper rev-matching...
-                    -- In other words: It doesn't spazz but it ends up being a really effective brake, so much so that the wheels are rev-matching the engine
-                    -- and not the other way around lmao.
                     local Target = InputRPM * Multiplier
                     local ReqTq = (Target - WheelRPM) * InputInertia * Clutch
 
-                    -- Link.ReqTq = max((Target - WheelRPM) * InputInertia * Clutch, -ScaledInertia) -- Boomer
-                    Link.ReqTq = max(ReqTq, -abs(ReqTq) * 0.05) -- Boomer twice, 0.05 is a magic number
+                    Link.ReqTq = ReqTq
                     TotalReqTq = TotalReqTq + Link.ReqTq
                 end
 
