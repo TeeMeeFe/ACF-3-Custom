@@ -41,7 +41,7 @@ do -- State Handling
 
         local ClockTime = Clock.CurTime
         local DeltaTime = ClockTime - SelfTbl.LastThink
-        local Torque    = SelfTbl.Torque
+        local Torque    = max(SelfTbl.Torque, 0)
         local RPM       = SelfTbl.FlyRPM or 0
         local IdleRPM   = SelfTbl.IdleRPM
         local AmbTemp   = SelfTbl.AmbientTemp
@@ -64,25 +64,22 @@ do -- State Handling
 
         local Rads = SelfTbl.Radiators
         for Ent, Link in pairs(Rads) do
-            if IsEntityValid(Ent) then
-                local EntTable = ENTITY.GetTable(Ent)
+            local EntTable = ENTITY.GetTable(Ent)
 
-                if not EntTable.Disabled then
-                    local Amount          = EntTable.Amount
-                    local Capacity        = EntTable.Capacity
+            if not EntTable.Disabled and EntTable.Active then
+                local Amount          = EntTable.Amount
+                local Capacity        = EntTable.Capacity
 
-                    local CoolantLevel    = Amount / Capacity
-                    local CoolantLevelMin = 0.15 -- Coolant level threshold
+                local CoolantLevel    = Amount / Capacity
+                local CoolantLevelMin = 0.15 -- Coolant level threshold
 
-                    -- Water pump flow. Cavitates if coolant level is critically low
-                    local Q = CoolantLevel >= CoolantLevelMin and K_PUMP_FLOW * RPM or 0
-                    SelfTbl.WaterPumpFlow = Q
+                -- Water pump flow. Cavitates if coolant level is critically low
+                local Q = CoolantLevel >= CoolantLevelMin and K_PUMP_FLOW * RPM or 0
+                SelfTbl.WaterPumpFlow = Q
 
-                    HOCool = Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime)
-                    Ent:SetActive(SelfTbl.Active) -- Set the radiator to whatever state this entity is in
-                else
-                    HOCool = Ent:CalcTemp(CT, 0, 0, DeltaTime)
-                end
+                HOCool = Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime)
+            else
+                HOCool = Ent:CalcTemp(CT, 0, 0, DeltaTime)
             end
         end
 

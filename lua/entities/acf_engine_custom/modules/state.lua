@@ -140,6 +140,13 @@ local function SetActive(Entity, Value, EntTbl)
         TimerRemove("ACF Engine Clock " .. Entity:EntIndex())
     end
 
+    -- Set the radiator to whatever state this entity is in
+    for Ent, Link in pairs(EntTbl.Radiators) do
+        if not Ent.Disabled then
+            Ent:SetActive(EntTbl.Active)
+        end
+    end
+
     Entity:UpdateOverlay()
     Entity:UpdateOutputs(EntTbl)
 end
@@ -328,14 +335,14 @@ do -- Actual engine rpm and torque calculations
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = max(FlyInertia, GearboxInertia * GearboxLoad)
 
-        Torque = (Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * (1 - GearboxLoad))) - Friction
+        local EngineTorque = (Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5))) - Friction -- Limited compression brake slip
 
         -- Let's accelerate the flywheel based on that torque
-        FlyRPM = max(FlyRPM + Torque / IncomingInertia - Friction, 0)
+        FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia - Friction, 0)
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
-        SelfTbl.State = FlyRPM < IdleRPM and "Stalling" or "Active"
+        SelfTbl.State = FlyRPM <= IdleRPM * 0.9 and "Stalling" or "Active"
         SelfTbl.Torque = Torque
         SelfTbl.Friction = Friction -- Assembly Friction
 

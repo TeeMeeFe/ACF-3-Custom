@@ -294,7 +294,8 @@ do -- Movement -----------------------------------------
                     local Target = InputRPM * Multiplier
                     local ReqTq = (Target - WheelRPM) * InputInertia * Clutch
 
-                    Link.ReqTq = ReqTq
+                    -- TODO: Real compression brake torque would go here instead.
+                    Link.ReqTq = max(ReqTq, -abs(ReqTq) * 0.05) -- Boomer, 0.05 is a magic number
                     TotalReqTq = TotalReqTq + Link.ReqTq
                 end
 
