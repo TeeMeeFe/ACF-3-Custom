@@ -68,8 +68,6 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
     CLASS.REF_BSFC      = 0.304     -- kg/kWh  (GenericPetrol)
     -- Default piston speed limit if Params does not specify one
     CLASS.DEFAULT_PISTON_SPEED = 20 -- m/s
-    -- Wankel: power strokes per rotor per shaft revolution
-    --CLASS.WANKEL_POWER_STROKES = 3  -- TODO: This shouldn't be here IMHO
 
     MENU_FIELD("ACF.CustomEngines.BaseEngineBlock", "BlockType", {
         "ACF.CustomEngines.InlineEngine",
