@@ -11,13 +11,13 @@ local abs   = math.abs
     --- It computes two tables (torque, friction) and fetches the powerband (min, max) based on said torque table.
     --- It also generates a redline value based on the remaining fraction (default 40% of remaining torque) of torque past the powerband.
     --- @param table TorqueCurve: flat array {mult0, mult1, ...} 0-1, evenly spaced over RPM.
-    --- @param number PeakTorque: pre-computed maximum or peak torque the engine can possibly generate.
+    --- @param number MaxTorque: pre-computed maximum or peak torque the engine can possibly generate.
     --- @param number MaxRPM: the upper theorical RPM limit at which point it generates exactly 0 torque.
     --- @param number IdleRPM: RPM at which the engine just idles. 
     --- @param number Displacement: engine displacement in Liters.
     --- @param number? Steps: number of steps to compute. Defaults to 200.
     --- @return table {T_Curve:table, F_Curve:table, Steps:number, Sample:function, PeakPower:table, PeakTorque:table, PowerBand:table, RedlineRPM:number}
-function Custom.BuildTorqueCurve(TorqueCurve, PeakTorque, MaxRPM, IdleRPM, Displacement, Steps)
+function Custom.BuildTorqueCurve(TorqueCurve, MaxTorque, MaxRPM, IdleRPM, Displacement, Steps)
     -- Constants
     local POWER_BAND_THRESHOLD = 0.8 -- Fraction of peak power that defines the band edges
     local REDLINE_TORQUE_FRAC  = 0.4 -- Fraction of remaining torque past its peak where we setup the redline RPM limiter
@@ -38,7 +38,10 @@ function Custom.BuildTorqueCurve(TorqueCurve, PeakTorque, MaxRPM, IdleRPM, Displ
     local T_Curve = {} -- Torque Curve
     local F_Curve = {} -- Friction Curve
 
-    local PeakPower     = 0
+    local PeakPower       = 0
+    -- Wait, didn't you already get this from the func args? Well yes but not, we gotta account for the TorqueCurve discontinuities, 
+    -- in which the inputted MaxTorque at the peak of the TorqueCurve does not quite match our expanded PeakTorque (its close though).
+    local PeakTorque      = 0
     local PeakTorqueIdx   = 0
     local PeakPowerAtRPM  = 0
     local PeakTorqueAtRPM = 0
@@ -49,9 +52,9 @@ function Custom.BuildTorqueCurve(TorqueCurve, PeakTorque, MaxRPM, IdleRPM, Displ
         local Idx0  = floor(Pos)
         local Idx1  = min(Idx0 + 1, N - 1)
         local blend = Pos - Idx0
-        local Val0    = TorqueCurve[Idx0 + 1] or 0
-        local Val1    = TorqueCurve[Idx1 + 1] or 0
-        T_Curve[I]  = PeakTorque * (Val0 + blend * (Val1 - Val0)) -- torque curve
+        local Val0  = TorqueCurve[Idx0 + 1] or 0
+        local Val1  = TorqueCurve[Idx1 + 1] or 0
+        T_Curve[I]  = MaxTorque * (Val0 + blend * (Val1 - Val0)) -- torque curve
         F_Curve[I]  = FRICTION_K_FRIC * (T_Curve[I] ^ FRICTION_RPM_EXP) * Displacement -- friction curve
 
         -- Get the i-th points
@@ -60,14 +63,15 @@ function Custom.BuildTorqueCurve(TorqueCurve, PeakTorque, MaxRPM, IdleRPM, Displ
         local Power_I  = Torque_I * (RPM_I * TWO_PI_OVER_60) * 0.001
 
         -- Get peak torque and at RPM
-        if Torque_I >= PeakTorque then
-            PeakTorqueAtRPM = RPM_I
+        if Torque_I > PeakTorque then
             PeakTorqueIdx   = I
+            PeakTorque      = Torque_I
+            PeakTorqueAtRPM = RPM_I
         end
 
         -- Get peak power and at RPM
         if Power_I > PeakPower then
-            PeakPower    = Power_I
+            PeakPower      = Power_I
             PeakPowerAtRPM = RPM_I
         end
     end
@@ -104,10 +108,10 @@ function Custom.BuildTorqueCurve(TorqueCurve, PeakTorque, MaxRPM, IdleRPM, Displ
         local Idx0  = floor(Frac)
         local Idx1  = min(Idx0 + 1, Steps)
         local blend = Frac - Idx0
-        local Tq0    = T_Curve[Idx0] or 0
-        local Fr0    = F_Curve[Idx0] or 0
-        local Tq1    = T_Curve[Idx1] or 0
-        local Fr1    = F_Curve[Idx1] or 0
+        local Tq0   = T_Curve[Idx0] or 0
+        local Fr0   = F_Curve[Idx0] or 0
+        local Tq1   = T_Curve[Idx1] or 0
+        local Fr1   = F_Curve[Idx1] or 0
         return {Tq0 + blend * (Tq1 - Tq0), Fr0 + blend * (Fr1 - Fr0)}
     end
 

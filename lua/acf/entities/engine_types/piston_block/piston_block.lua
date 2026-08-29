@@ -99,7 +99,12 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
         local Pistons     = Params.Pistons
         local PistonSpeed = Params.PistonSpeed or CLASS.DEFAULT_PISTON_SPEED -- In meters per second
 
-        -- Validate clearance, must be positive and less than stroke
+        -- Pre-validation steps.
+        -- Stroke, if its a wankel we want it to be max 3cm of eccentricity.
+        -- TODO: The number 3 is the actual class maximum, probably should fetch from there instead of hardcoding this.
+        Stroke = Params.Layout == "Wankel" and Clamp(Stroke, 1, 3) or Stroke
+
+        -- Clearance, must be positive and less than stroke
         Clearance = Clamp(Clearance, 0.05, Stroke - 0.01)
 
         -- 1. Compression ratio (dimensionless, cm cancel)
