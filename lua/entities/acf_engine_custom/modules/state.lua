@@ -153,9 +153,9 @@ end
 
 --- Default BSFC fuel flow in L/s.
 --- Off-peak throttle raises effective BSFC by up to 11%.
-local function DefaultFuelFlow(Throttle, Power_KW, BSFC, FuelDensity)
+local function DefaultFuelFlow(Throttle, Power, BSFC, FuelDensity)
     local EffectiveBSFC = BSFC * (1 + 0.11 * (1 - Throttle))
-    local Flow = (Power_KW * EffectiveBSFC) / 3600 / FuelDensity -- Flow in Kg / Fuel density
+    local Flow = (Power * EffectiveBSFC) / 3600 / FuelDensity -- Flow in Kg / Fuel density
     return Flow
 end
 
@@ -196,6 +196,7 @@ do -- Actual engine rpm and torque calculations
 
     function ENT:Think()
         local SelfTbl = ENTITY.GetTable(self)
+        if SelfTbl.Disabled then return end
 
         -- Keep updating temps even if the radiator is off
         if not SelfTbl.Active then
@@ -209,7 +210,6 @@ do -- Actual engine rpm and torque calculations
             end
             return
         end
-        if SelfTbl.Disabled then return end
 
         self:CalcRPM(SelfTbl)
         self:CalcTemp(SelfTbl)
@@ -233,6 +233,12 @@ do -- Actual engine rpm and torque calculations
 
         local ClockTime  = Clock.CurTime
         local DeltaTime  = ClockTime - SelfTbl.LastThink
+
+        -- Due to the temperature clock, every one second it'll synchronize the DeltaTime to our ClockTime,
+        -- so we have to return early to avoid some issues downstream. This doesn't mean this tick will be wasted,
+        -- since DeltaTime is already returning 0 at this state, so nothing of significance could happen anyway. 
+        if DeltaTime == 0 then return end
+
         local FuelTank   = GetNextFuelTank(SelfTbl)
         local TorqueMult = SelfTbl.GetTorqueMult() -- Idk if this will work given the tight perf budget we have to work with here...
         local IsElectric = SelfTbl.IsElectric
@@ -270,7 +276,7 @@ do -- Actual engine rpm and torque calculations
 
             local Consumption = SelfTbl.GetConsumption(self, Throttle, FlyRPM, FuelTank, SelfTbl) * DeltaTime
 
-            SelfTbl.FuelUsage = 60 * Consumption / DeltaTime
+            SelfTbl.FuelUsage = 60 * Consumption / max(DeltaTime, 0.001) -- Clamp this bitch so it doesn't NaN out
             ENTITY.GetTable(FuelTank).Consume(FuelTank, Consumption)
         elseif ACF.RequireFuel then -- Stay active if fuel consumption is disabled
             SetActive(self, false, SelfTbl)

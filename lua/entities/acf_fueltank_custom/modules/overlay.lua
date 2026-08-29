@@ -12,7 +12,13 @@ function ENT:ACF_UpdateOverlayState(State)
         State:AddWarning("WARNING: Leaking!")
     end
 
-    -- The V2 fuel type instance lives on the entity's field set; read it straight off.
+    -- The V2 fuel type and size instances lives on the entity's field set; read them straight off.
+    local SizeX = self:ACF_GetUserVar("FuelSizeX")
+    local SizeY = self:ACF_GetUserVar("FuelSizeY")
+    local SizeZ = self:ACF_GetUserVar("FuelSizeZ")
+
+    State:AddKeyValue("Size", ("%s x %s x %s"):format(SizeX, SizeY, SizeZ))
+
     local FuelType = self:ACF_GetUserVar("FuelType")
 
     State:AddKeyValue("Fuel Type", FuelType and FuelType.ID or self.FuelType)

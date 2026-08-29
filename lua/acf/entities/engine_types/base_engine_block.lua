@@ -59,9 +59,9 @@ Classes.DefineClass("ACF.CustomEngineTypes.GenericDiesel", "ACF.CustomEngineType
     CLASS.PistonSpeed  = 13 -- m/s
     CLASS.Efficiency   = 0.243
     CLASS.IgnitionType = "glow"
-    CLASS.Fuel		   = { ["ACF.CustomFuelTypes.Diesel"] = true }
+    CLASS.Fuel		   = { ["ACF.CustomFuelTypes.CustomDiesel"] = true }
 
-    FIELD("ACF.CustomFuelTypes.FuelType", "FuelType", {"ACF.CustomFuelTypes.Diesel"})
+    FIELD("ACF.CustomFuelTypes.FuelType", "FuelType", {"ACF.CustomFuelTypes.CustomDiesel"})
 end)
 
 -- Any Petrol engines
@@ -75,13 +75,13 @@ Classes.DefineClass("ACF.CustomEngineTypes.GenericPetrol", "ACF.CustomEngineType
     CLASS.Efficiency   = 0.304
     CLASS.IgnitionType = "spark"
     CLASS.Fuel		   = {
-        ["ACF.CustomFuelTypes.Petrol"] = true,
+        ["ACF.CustomFuelTypes.CustomPetrol"] = true,
         ["ACF.CustomFuelTypes.E85"] = true,
         ["ACF.CustomFuelTypes.Methanol"] = true
     }
 
     FIELD("ACF.CustomFuelTypes.FuelType", "FuelType", {
-        "ACF.CustomFuelTypes.Petrol",
+        "ACF.CustomFuelTypes.CustomPetrol",
         "ACF.CustomFuelTypes.E85",
         "ACF.CustomFuelTypes.Methanol"
     })
@@ -99,16 +99,16 @@ Classes.DefineClass("ACF.CustomEngineTypes.Turbine", "ACF.CustomEngineTypes.Base
     CLASS.HealthMult   = 0.125
     -- Turbines are okay with anything that can burn 
     CLASS.Fuel		   = {
-        ["ACF.CustomFuelTypes.Diesel"] = true,
-        ["ACF.CustomFuelTypes.Petrol"] = true,
+        ["ACF.CustomFuelTypes.CustomDiesel"] = true,
+        ["ACF.CustomFuelTypes.CustomPetrol"] = true,
         ["ACF.CustomFuelTypes.E85"] = true,
         ["ACF.CustomFuelTypes.Methanol"] = true,
         ["ACF.CustomFuelTypes.JetFuel"] = true
     }
 
     FIELD("ACF.CustomFuelTypes.FuelType", "FuelType", {
-        "ACF.CustomFuelTypes.Diesel",
-        "ACF.CustomFuelTypes.Petrol",
+        "ACF.CustomFuelTypes.CustomDiesel",
+        "ACF.CustomFuelTypes.CustomPetrol",
         "ACF.CustomFuelTypes.E85",
         "ACF.CustomFuelTypes.Methanol",
         "ACF.CustomFuelTypes.JetFuel"
