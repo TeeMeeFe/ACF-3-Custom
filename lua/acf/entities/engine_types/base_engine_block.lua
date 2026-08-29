@@ -54,6 +54,7 @@ Classes.DefineClass("ACF.CustomEngineTypes.GenericDiesel", "ACF.CustomEngineType
     CLASS.Name         = "Generic Diesel Engine"
     CLASS.ShortName    = "Diesel"
     CLASS.TorqueScale  = 0.25
+    CLASS.TorqueCurve = { 0, 0.7, 0.96, 1, 0.97, 0.93, 0.82, 0.7, 0.3, 0 }
     CLASS.HealthMult   = 0.5
     CLASS.PistonSpeed  = 13 -- m/s
     CLASS.Efficiency   = 0.243
@@ -68,6 +69,7 @@ Classes.DefineClass("ACF.CustomEngineTypes.GenericPetrol", "ACF.CustomEngineType
     CLASS.Name         = "Generic Petrol Engine"
     CLASS.ShortName    = "Petrol"
     CLASS.TorqueScale  = 0.25
+    CLASS.TorqueCurve = { 0, 0.4, 0.65, 0.85, 1, 0.9, 0.6, 0.4, 0.1, 0 }
     CLASS.HealthMult   = 0.2
     CLASS.PistonSpeed  = 20 -- m/s
     CLASS.Efficiency   = 0.304

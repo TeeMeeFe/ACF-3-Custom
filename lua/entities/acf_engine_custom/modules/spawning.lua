@@ -30,6 +30,7 @@ local function UpdateEngine(Entity, ClassData)
 		PistonSpeed  = TypeDef.PistonSpeed,
 		Efficiency   = TypeDef.Efficiency,
 		TorqueScale  = TypeDef.TorqueScale,
+		TorqueCurve  = TypeDef.TorqueCurve,
 		IgnitionType = TypeDef.IgnitionType
 	}
 
@@ -51,12 +52,12 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.Name      			= Name
 	Entity.ShortName 			= Type
 	Entity.BalanceFactor  		= Compute.BalanceFactor
-	Entity.BigEndDiam     		= Compute.BigEndDiam_cm
+	Entity.BigEndDiam     		= Compute.BigEndDiam
 	Entity.BlockType	 		= Compute.IsPiston and "Piston" or Compute.IsTurbine and "Turbine" or Compute.IsElectric and "Electric"
-	Entity.Bore	        		= Compute.BoreCm
+	Entity.Bore	        		= Compute.Bore
 	Entity.BSFC 				= Compute.BSFC
 	Entity.CompressionRatio 	= Compute.CompressionRatio
-	Entity.Clearance      		= Compute.ClearanceCm
+	Entity.Clearance      		= Compute.Clearance
 	Entity.CoolantLevel         = 0
 	Entity.DefaultSound       	= Entity.SoundPath
 	Entity.Displacement 		= Displacement
@@ -87,7 +88,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.Sample				= Compute.Sample
 	Entity.Scale                = Compute.ModelScale
 	Entity.SparksPerRev			= Compute.SparksPerRev
-	Entity.Stroke				= Compute.StrokeCm
+	Entity.Stroke				= Compute.Stroke
 	Entity.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	Entity.Type                 = TypeDef.Name
 	Entity.TorqueSmoothness		= Compute.TorqueSmoothness

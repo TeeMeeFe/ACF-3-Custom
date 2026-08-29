@@ -32,7 +32,7 @@ Classes.DefineClass("ACF.CustomEngines.RotaryEngine", "ACF.CustomEngines.PistonB
             TorqueSmoothness   = 1.00,
             BSFCMult           = 1.15,            -- apex seal leakage penalty
             IdleRPMMult        = 1.60,            -- rotary idles at higher RPM
-            VEBonus            = -0.05,           -- seal leakage reduces VE
+            VEBonus            = -0.12,           -- seal leakage reduces VE
             FiringIrregularity = 0.0,             -- always even firing
             -- Each rotor fires 3 times per shaft revolution (3 chambers, 120° apart)
             SparksPerRev       = CLASS.WankelPowerStrokes,
@@ -49,6 +49,7 @@ Classes.DefineClass("ACF.CustomEngines.RotaryEngine", "ACF.CustomEngines.PistonB
         Params.IgnitionType = Args.IgnitionType
         Params.PistonSpeed  = Args.PistonSpeed
         Params.TorqueScale  = Args.TorqueScale
+        Params.TorqueCurve  = Args.TorqueCurve
         -- Params.HeadShape    = ACF.GetClientData("CustomEngineCylinderHead", Classes.GetTypeFieldByName(CLASS, "CustomEngineCylinderHead").Options.Default)
         -- Params.Cam_mod      = ACF.GetClientData("CustomEngineCamshaftType", Classes.GetTypeFieldByName(CLASS, "CustomEngineCamshaftType").Options.Default)
 

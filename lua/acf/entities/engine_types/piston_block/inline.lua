@@ -49,6 +49,7 @@ Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonB
         Params.IgnitionType = Args.IgnitionType
         Params.PistonSpeed  = Args.PistonSpeed
         Params.TorqueScale  = Args.TorqueScale
+        Params.TorqueCurve  = Args.TorqueCurve
         -- Params.HeadShape    = ACF.GetClientData("CustomEngineCylinderHead", Classes.GetTypeFieldByName(CLASS, "CustomEngineCylinderHead").Options.Default)
         -- Params.Cam_mod      = ACF.GetClientData("CustomEngineCamshaftType", Classes.GetTypeFieldByName(CLASS, "CustomEngineCamshaftType").Options.Default)
 
