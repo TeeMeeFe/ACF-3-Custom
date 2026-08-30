@@ -21,11 +21,16 @@ function ENT:ACF_UpdateOverlayState(State)
     local RedlineRPM = Round(self.RedlineRPM)
 
     State:AddHeader(self.Name, 2)
+    if not IsValid(self.Starter) and self.HasStarter then
+        State:AddError("This engine has no starter but requires one!")
+    end
+
     if self.State == "Active" then
         State:AddSuccess(self.State)
     else
         State:AddWarning(self.State)
     end
+
     State:AddKeyValue("Type", self.Type)
     -- Unit conversion on bore and stroke, from Centimeters to Millimeters
     State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))

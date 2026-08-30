@@ -60,4 +60,14 @@ Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonB
     end
 
     function CLASS.CreateMenu() end -- Must do to prevent a stack overflow somehow
+
+    -- Custom attachment bullshit
+    function CLASS.AddCustomAttachments()
+        ACF.AddCustomAttachment("models/engines/inline2s.mdl", "starter", Vector(-3.785, -6, 4.875), Angle(0, 0, 90))
+        ACF.AddCustomAttachment("models/engines/inline3s.mdl", "starter", Vector(-3.6, -6, 4.875), Angle(0, 0, 90))
+        ACF.AddCustomAttachment("models/engines/inline4s.mdl", "starter", Vector(-5.75, -6, 4.875), Angle(0, 0, 90))
+        ACF.AddCustomAttachment("models/engines/inline5s.mdl", "starter", Vector(-9.5, -6, 4.875), Angle(0, 0, 90))
+        ACF.AddCustomAttachment("models/engines/inline6s.mdl", "starter", Vector(-10.125, -6, 4.875), Angle(0, 0, 90))
+        print("Setup attachments for Inline engines complete.")
+    end
 end)

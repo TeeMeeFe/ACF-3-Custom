@@ -1,12 +1,9 @@
 DEFINE_BASECLASS("acf_base_scalable")
 
-ENT.PrintName      = "ACF Custom Engine"
-ENT.WireDebugName  = "ACF Custom Engine"
-ENT.PluralName     = "ACF Custom Engines"
-ENT.ACF_Limit      = 20
+ENT.ACF_Limit           = 20
 ENT.ACF_PreventArmoring = true
 
-ENT.IsACFCustomEngine = true
+ENT.IsACFEngineCustom = true
 
 ACF.Entities.AutoRegisterV2(function(CLASS)
     MENU_FIELD("ACF.CustomEngines.BaseEngineBlock", "BlockType", {
@@ -30,7 +27,7 @@ ACF.Entities.AutoRegisterV2(function(CLASS)
     MENU_FIELD("String", "CustomEngineCamshaftType", {Default = "Stock"})
     -- Nothing to validate: the Engine field is constrained to ACF.Engines.* subtypes by the serializer.
     function CLASS:VerifyData() end
-end, "Custom Engine", "Custom Engines")
+end, "Custom Engine")
 
 ENT.ACF_StaticWireInputs = {
     "Active (If set to a non-zero value, it'll attempt to start the engine.)",

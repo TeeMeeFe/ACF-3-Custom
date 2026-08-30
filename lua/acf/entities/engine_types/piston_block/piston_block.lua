@@ -463,4 +463,29 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
             ACF.Menu.LoadClassCombo(EngineClass, Classes.GetChildren(CLASS), "Name", nil, PAGE, "engine")
         end
     end
+
+    -- -- Custom attachment bullshit
+    -- function CLASS.SetCustomAttachments()
+    --     -- Inline engines
+    --     ACF.SetCustomAttachments("models/engines/inline2s.mdl",
+    --         {Name = "driveshaft", Pos = Vector(-6, 0, 4), Ang = Angle(0, 180, 90)},
+    --         {Name = "starter", Pos = Vector(-3.785, -6, 4.875), Ang = Angle(0, 0, 90)}
+    --     )
+    --     ACF.SetCustomAttachments("models/engines/inline3s.mdl",
+    --         {Name = "driveshaft", Pos = Vector(-6, 0, 4.4), Ang = Angle(0, 180, 90)},
+    --         {Name = "starter", Pos = Vector(-3.6, -6, 4.875), Ang = Angle(0, 0, 90)}
+    --     )
+    --     ACF.SetCustomAttachments("models/engines/inline4s.mdl",
+    --         {Name = "driveshaft", Pos = Vector(-6, 0, 4), Ang = Angle(0, 180, 90)},
+    --         {Name = "starter", Pos = Vector(-5.75, -6, 4.875), Ang = Angle(0, 0, 90)}
+    --     )
+    --     ACF.SetCustomAttachments("models/engines/inline5s.mdl",
+    --         {Name = "driveshaft", Pos = Vector(-10, 0, 4.4), Ang = Angle(0, 180, 90)},
+    --         {Name = "starter", Pos = Vector(-9.5, -6, 4.875), Ang = Angle(0, 0, 90)}
+    --     )
+    --     ACF.SetCustomAttachments("models/engines/inline6s.mdl",
+    --         {Name = "driveshaft", Pos = Vector(-12, 0, 4.4), Ang = Angle(0, 180, 90)},
+    --         {Name = "starter", Pos = Vector(-10.125, -6, 4.875), Ang = Angle(0, 0, 90)}
+    --     )
+    -- end
 end)    

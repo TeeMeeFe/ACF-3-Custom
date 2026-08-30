@@ -18,6 +18,8 @@ net.Receive("ACF_RequestCustomEngineInfo", function(_, Ply)
         local Outputs    = {}
         local FuelTanks  = {}
         local Radiators  = {}
+        local Starter    = vector_origin
+        local HasStarter = Entity.HasStarter
         local Driveshaft = Entity.Out.Pos
 
         if next(Entity.Gearboxes) then
@@ -38,9 +40,17 @@ net.Receive("ACF_RequestCustomEngineInfo", function(_, Ply)
             end
         end
 
+        if IsValid(Entity.Starter) then
+            Starter = Entity.StarterPos
+        elseif not IsValid(Entity.Starter) and HasStarter then
+            HasStarter = false
+        end
+
         net.Start("ACF_RequestCustomEngineInfo")
             net.WriteEntity(Entity)
+            net.WriteVector(Starter)
             net.WriteVector(Driveshaft)
+            net.WriteBool(HasStarter)
             net.WriteUInt(#Outputs, 6)
             net.WriteUInt(#FuelTanks, 6)
             net.WriteUInt(#Radiators, 6)

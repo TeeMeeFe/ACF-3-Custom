@@ -1,5 +1,7 @@
 local ACF     		= ACF
 local Classes 		= ACF.Classes
+local Messages      = ACF.Utilities.Messages
+
 local GetType 		= Classes.GetTypeByName
 local Round   		= math.Round
 local max           = math.max
@@ -132,6 +134,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.FuelTanks     		= {}
 	self.Gearboxes     		= {}
 	self.Radiators     		= {}
+	self.HasStarter         = true -- TODO: true for now, it should be a uservar
+	self.Starter            = nil
 	self.Friction           = 0
 	self.MassRatio     		= 1
 	self.LastThink     		= 0
@@ -159,10 +163,62 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.WaterPumpFlow		= 0
 
 	duplicator.ClearEntityModifier(self, "mass")
+	CFW.addTransformProxy("acf_engine_custom", "Starter", "acf_starter", "Engine")
 end
 
 function ENT.ACF_CheckSpawnLimit(Player)
 	return Player:CheckLimit("_acf_engine_custom")
+end
+
+local function OnUpdateEntity(Entity)
+	local SelfTbl = Entity:GetTable()
+	if not SelfTbl.HasStarter then return end
+
+	-- Rebuild the starter.
+	if not IsValid(SelfTbl.Starter) then
+		local Starter = ents.Create("acf_starter")
+
+		if not IsValid(Starter) then
+			error(tostring(Entity) .. " did not have a valid starter spawn with it!")
+			Entity:Remove()
+
+			return
+		-- Setup custom attachments if none was found.
+		elseif Entity:LookupAttachment("starter") == 0 then
+			GetType(SelfTbl.EngineBlockType).AddCustomAttachments() -- Call to set the attachment points.
+
+			-- Fucking bitchass function didn't work? Print error in chat and gtfo here.
+			if Entity:LookupAttachment("starter") == 0 then
+				local Owner = Entity:GetOwner()
+
+				Messages.SendChat(Owner, "Error", tostring(Entity) .. " did not have a valid attachment point for \"starter\"!")
+				Starter:Remove()
+				return
+			end
+		end
+
+		local StarterPos = Entity:GetAttachment(Entity:LookupAttachment("starter")).Pos
+		local StarterAng = Entity:GetAttachment(Entity:LookupAttachment("starter")).Ang
+
+		Starter:SetScaledModel("models/engines/emotor-standalone-tiny.mdl")
+		Starter:SetLocalPos(StarterPos)
+		Starter:SetAngles(StarterAng)
+		Starter:SetScale(0.5 * SelfTbl.Scale)
+		Starter:SetParent(Entity)
+		Starter:Spawn()
+		Starter:SetCollisionGroup(COLLISION_GROUP_WORLD)
+		Starter:DrawShadow(false)
+
+		Entity:SetNWEntity("ACF.Starter", Starter)
+
+		local Mass = 5 * SelfTbl.Scale[1]
+		Contraption.SetMass(Starter, Mass)
+
+		SelfTbl.StarterPos = Entity:WorldToLocal(StarterPos)
+		SelfTbl.Starter = Starter
+		Starter.Engine  = Entity
+		Starter.Owner   = Entity
+	end
 end
 
 function ENT:ACF_PostSpawn()
@@ -176,6 +232,7 @@ end
 
 function ENT:ACF_PostUpdateEntityData(ClientData)
 	UpdateEngine(self, self:GetBlockType())
+	OnUpdateEntity(self)
 
 	-- A reconfigure can invalidate existing links (no-op on a fresh spawn).
 	if next(self.Gearboxes) then

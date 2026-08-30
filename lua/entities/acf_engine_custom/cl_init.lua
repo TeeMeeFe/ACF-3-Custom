@@ -18,7 +18,9 @@ do	-- NET SURFER 2.0
 
 	net.Receive("ACF_RequestCustomEngineInfo", function()
 		local Engine		= net.ReadEntity()
+		local Starter       = net.ReadVector()
 		local Driveshaft	= net.ReadVector()
+		local HasStarter    = net.ReadBool()
 		local Outputs		= {}
 		local Fuel			= {}
 		local Rads     		= {}
@@ -78,6 +80,8 @@ do	-- NET SURFER 2.0
 		Engine.FuelTanks	= FuelTanks
 		Engine.Radiators    = Radiators
 		Engine.Driveshaft	= Driveshaft
+		Engine.HasStarter   = HasStarter
+		Engine.Starter      = Starter
 
 		Engine.HasData	= true
 		Engine.Age		= Clock.CurTime + 5
@@ -101,6 +105,7 @@ end
 do	-- Overlay
 	-- Rendered is used to prevent re-rendering as part of the extended link rendering
 	local source = Color(255, 255, 0)
+	local green  = Color(60, 255, 10)
 	local orange = Color(255, 127, 0)
 
 	function ENT:DrawLinks(Rendered)
@@ -121,6 +126,7 @@ do	-- Overlay
 		local Rad = TimedCos(0.5, 2, 3, 0)
 
 		local OutPos = self:LocalToWorld(SelfTbl.Driveshaft)
+		local StarterPos = self:LocalToWorld(SelfTbl.Starter)
 
 		for _, T in ipairs(SelfTbl.Outputs) do
 			local E = T.Ent
@@ -139,6 +145,10 @@ do	-- Overlay
 		end
 
 		render.DrawSphere(OutPos, Rad, 4, 3, source)
+
+		if SelfTbl.HasStarter then
+			render.DrawSphere(StarterPos, Rad, 4, 3, green)
+		end
 	end
 
 	local FuelColor		= Color(255, 255, 0, 25)
@@ -181,8 +191,12 @@ do	-- Overlay
 		self:DrawLinks({self = true}, true)
 
 		local OutTextPos = self:LocalToWorld(SelfTbl.Driveshaft):ToScreen()
+		local StarterTextPos = self:LocalToWorld(SelfTbl.Starter):ToScreen()
 		cam.Start2D()
 			draw.SimpleTextOutlined("Power Source", "ACF_Title", OutTextPos.x, OutTextPos.y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
+			if SelfTbl.HasStarter then
+				draw.SimpleTextOutlined("Starter", "ACF_Title", StarterTextPos.x, StarterTextPos.y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
+			end
 		cam.End2D()
 	end
 end
