@@ -4,14 +4,15 @@ ENT.OverlayDelay = 0.1
 
 function ENT:ACF_UpdateOverlayState(State)
     local TorqueMult = self.GetTorqueMult() -- Janky i know, but i gotta get this to work first.
+    local DamageMult = self.TorqueDamageMult
     local CompressionRatio = Round(self.CompressionRatio, 1)
 
-    local PeakPower  = {InKW = Round(self.PeakPower.InKW) * TorqueMult,
-                        InHP = Round(self.PeakPower.InHP) * TorqueMult,
+    local PeakPower  = {InKW = Round(self.PeakPower.InKW * TorqueMult * DamageMult),
+                        InHP = Round(self.PeakPower.InHP * TorqueMult * DamageMult),
                         AtRPM = Round(self.PeakPower.AtRPM)}
 
-    local PeakTorque = {InNm = Round(self.PeakTorque.InNm) * TorqueMult,
-                        InFtLb = Round(self.PeakTorque.InFtLb) * TorqueMult,
+    local PeakTorque = {InNm = Round(self.PeakTorque.InNm * TorqueMult * DamageMult),
+                        InFtLb = Round(self.PeakTorque.InFtLb * TorqueMult * DamageMult),
                         AtRPM = Round(self.PeakTorque.AtRPM)}
 
     local PowerBand  = {Min = Round(self.PowerBand.Min),

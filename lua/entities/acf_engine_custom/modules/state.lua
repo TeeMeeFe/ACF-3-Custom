@@ -241,6 +241,7 @@ do -- Actual engine rpm and torque calculations
 
         local FuelTank   = GetNextFuelTank(SelfTbl)
         local TorqueMult = SelfTbl.GetTorqueMult() -- Idk if this will work given the tight perf budget we have to work with here...
+        local DamageMult = SelfTbl.TorqueDamageMult
         local IsElectric = SelfTbl.IsElectric
         local IdleRPM    = SelfTbl.IdleRPM
         local LimitRPM   = SelfTbl.LimitRPM
@@ -296,7 +297,7 @@ do -- Actual engine rpm and torque calculations
         -- if Throttle ~= 0 and FlyRPM < LimitRPM then
         if FlyRPM < LimitRPM then
             local Sample = SelfTbl.Sample(FlyRPM)
-            Torque = Throttle * Sample[1] * TorqueMult
+            Torque = Throttle * Sample[1] * TorqueMult * DamageMult
             Friction = Sample[2]
         else
             Torque = 0

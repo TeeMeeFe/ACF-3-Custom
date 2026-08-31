@@ -60,4 +60,6 @@ Classes.DefineClass("ACF.CustomEngines.RotaryEngine", "ACF.CustomEngines.PistonB
     end
 
     function CLASS.CreateMenu() end -- Must do to prevent a stack overflow somehow
+
+    function CLASS.AddCustomAttachments() end
 end)

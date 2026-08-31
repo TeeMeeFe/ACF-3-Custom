@@ -95,6 +95,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.Type                 = TypeDef.Name
 	Entity.TorqueSmoothness		= Compute.TorqueSmoothness
 	Entity.TorqueCurve			= Compute.Curve
+	Entity.TorqueScale          = TypeDef.TorqueScale
 	Entity.Torque           	= 0
 	Entity.VECurve		    	= Compute.VECurve
 	Entity.HitBoxes         	= ACF.GetHitboxes(Entity:GetModel())
@@ -151,6 +152,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.FuelUsage     		= 0
 	self.Layout 	   		= ""
 	self.Throttle 	   		= 0
+	self.TorqueDamageMult   = 1
 	self.IdleThrottle	    = 0
 	self.LastIdleThrottle   = 0
 	self.IsStalled		    = false
@@ -163,7 +165,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.WaterPumpFlow		= 0
 
 	duplicator.ClearEntityModifier(self, "mass")
-	CFW.addTransformProxy("acf_engine_custom", "Starter", "acf_starter", "Engine")
+	CFW.addParentDetour("acf_starter", "Starter")
+	-- CFW.addTransformProxy("acf_engine_custom", "Starter", "acf_starter", "Engine")
 end
 
 function ENT.ACF_CheckSpawnLimit(Player)
@@ -184,38 +187,41 @@ local function OnUpdateEntity(Entity)
 
 			return
 		-- Setup custom attachments if none was found.
-		elseif Entity:LookupAttachment("starter") == 0 then
-			GetType(SelfTbl.EngineBlockType).AddCustomAttachments() -- Call to set the attachment points.
+		-- elseif Entity:LookupAttachment("starter") == 0 then
+		-- 	GetType(SelfTbl.EngineBlockType).AddCustomAttachments() -- Call to set the attachment points.
 
-			-- Fucking bitchass function didn't work? Print error in chat and gtfo here.
-			if Entity:LookupAttachment("starter") == 0 then
-				local Owner = Entity:GetOwner()
+		-- 	-- Fucking bitchass function didn't work? Print error in chat and gtfo here.
+		-- 	if Entity:LookupAttachment("starter") == 0 then
+		-- 		local Owner = Entity:GetOwner()
 
-				Messages.SendChat(Owner, "Error", tostring(Entity) .. " did not have a valid attachment point for \"starter\"!")
-				Starter:Remove()
-				return
-			end
+		-- 		Messages.SendChat(Owner, "Error", tostring(Entity) .. " did not have a valid attachment point for \"starter\"!")
+		-- 		Starter:Remove()
+		-- 		return
+		-- 	end
 		end
 
-		local StarterPos = Entity:GetAttachment(Entity:LookupAttachment("starter")).Pos
-		local StarterAng = Entity:GetAttachment(Entity:LookupAttachment("starter")).Ang
-
-		Starter:SetScaledModel("models/engines/emotor-standalone-tiny.mdl")
-		Starter:SetLocalPos(StarterPos)
-		Starter:SetAngles(StarterAng)
-		Starter:SetScale(0.5 * SelfTbl.Scale)
-		Starter:SetParent(Entity)
-		Starter:Spawn()
-		Starter:SetCollisionGroup(COLLISION_GROUP_WORLD)
-		Starter:DrawShadow(false)
+		-- local StarterPos = Entity:GetAttachment(Entity:LookupAttachment("starter")).Pos
+		-- local StarterAng = Entity:GetAttachment(Entity:LookupAttachment("starter")).Ang
 
 		Entity:SetNWEntity("ACF.Starter", Starter)
 
-		local Mass = 5 * SelfTbl.Scale[1]
-		Contraption.SetMass(Starter, Mass)
+		Starter:SetModel("models/hunter/plates/plate.mdl")
+		Starter:SetPos(Entity:GetPos())
+		Starter:SetAngles(Entity:GetAngles())
+		Starter:SetParent(Entity)
+		Starter:Spawn()
+		Starter:PhysicsInit(SOLID_VPHYSICS)
+		Starter:SetRenderMode(RENDERMODE_NONE)
+		Starter:SetNotSolid(true)
+		Starter:DrawShadow(false)
 
-		SelfTbl.StarterPos = Entity:WorldToLocal(StarterPos)
+		-- local Mass = 5 * SelfTbl.Scale[1]
+		-- Contraption.SetMass(Starter, Mass)
+
+		-- SelfTbl.StarterPos = Entity:WorldToLocal(StarterPos)
 		SelfTbl.Starter = Starter
+		-- Starter.State   = "Idle"
+		-- Starter.Active  = 0
 		Starter.Engine  = Entity
 		Starter.Owner   = Entity
 	end

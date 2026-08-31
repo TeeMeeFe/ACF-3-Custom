@@ -92,4 +92,6 @@ Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBl
     end
 
     function CLASS.CreateMenu() end -- Must do to prevent a stack overflow somehow
+
+    function CLASS.AddCustomAttachments() end
 end)
