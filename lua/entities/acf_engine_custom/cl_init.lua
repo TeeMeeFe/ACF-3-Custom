@@ -105,7 +105,7 @@ end
 do	-- Overlay
 	-- Rendered is used to prevent re-rendering as part of the extended link rendering
 	local source = Color(255, 255, 0)
-	local green  = Color(60, 255, 10)
+	-- local green  = Color(60, 255, 10)
 	local orange = Color(255, 127, 0)
 
 	function ENT:DrawLinks(Rendered)

@@ -1,6 +1,5 @@
 local ACF     		= ACF
 local Classes 		= ACF.Classes
-local Messages      = ACF.Utilities.Messages
 
 local GetType 		= Classes.GetTypeByName
 local Round   		= math.Round
@@ -186,22 +185,7 @@ local function OnUpdateEntity(Entity)
 			Entity:Remove()
 
 			return
-		-- Setup custom attachments if none was found.
-		-- elseif Entity:LookupAttachment("starter") == 0 then
-		-- 	GetType(SelfTbl.EngineBlockType).AddCustomAttachments() -- Call to set the attachment points.
-
-		-- 	-- Fucking bitchass function didn't work? Print error in chat and gtfo here.
-		-- 	if Entity:LookupAttachment("starter") == 0 then
-		-- 		local Owner = Entity:GetOwner()
-
-		-- 		Messages.SendChat(Owner, "Error", tostring(Entity) .. " did not have a valid attachment point for \"starter\"!")
-		-- 		Starter:Remove()
-		-- 		return
-		-- 	end
 		end
-
-		-- local StarterPos = Entity:GetAttachment(Entity:LookupAttachment("starter")).Pos
-		-- local StarterAng = Entity:GetAttachment(Entity:LookupAttachment("starter")).Ang
 
 		Entity:SetNWEntity("ACF.Starter", Starter)
 
@@ -215,13 +199,14 @@ local function OnUpdateEntity(Entity)
 		Starter:SetNotSolid(true)
 		Starter:DrawShadow(false)
 
-		-- local Mass = 5 * SelfTbl.Scale[1]
-		-- Contraption.SetMass(Starter, Mass)
+		Starter:ACF_PostSpawn()
 
-		-- SelfTbl.StarterPos = Entity:WorldToLocal(StarterPos)
+		-- Starters are incorporated into the engines that have them, this also means there's increased mass as well
+		local IncreasedMass = 5 * SelfTbl.Scale[1]
+		Contraption.SetMass(Entity, SelfTbl.Mass + IncreasedMass)
+
 		SelfTbl.Starter = Starter
-		-- Starter.State   = "Idle"
-		-- Starter.Active  = 0
+		Starter.TorqueStall = 1.1 * SelfTbl.Scale[1]
 		Starter.Engine  = Entity
 		Starter.Owner   = Entity
 	end

@@ -5,6 +5,7 @@ local Sounds = ACF.Utilities.Sounds
 local ENTITY = FindMetaTable("Entity")
 
 local function GetPitchVolume(Engine)
+	if Engine.State == "Cranking" or Engine.State == "Idle" then return 0, 0 end
 	local RPM = Engine.FlyRPM
 	local Pitch = clamp(20 + (RPM * Engine.SoundPitch) * 0.02, 1, 255)
 	-- Rev limiter code disabled because it has issues with the volume delta time, but it's still here if we need it

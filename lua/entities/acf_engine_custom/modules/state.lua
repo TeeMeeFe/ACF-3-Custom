@@ -93,6 +93,16 @@ local function CheckDistantRadiators(Engine)
     end
 end
 
+local function SetStarterActive(EntTbl, Active)
+    local Starter = EntTbl.Starter
+    if not IsEntityValid(Starter) then return end
+
+    local SrtTable = Starter:GetTable()
+    if SrtTable.IsCranking == Active then return end
+
+    SrtTable.SetActive(Starter, Active)
+end
+
 local function SetActive(Entity, Value, EntTbl)
     EntTbl = EntTbl or Entity:GetTable()
 
@@ -107,10 +117,7 @@ local function SetActive(Entity, Value, EntTbl)
 
         Entity:CalcMassRatio(EntTbl)
 
-        EntTbl.State     = "Active"
         EntTbl.LastThink = Clock.CurTime
-        EntTbl.Torque    = EntTbl.PeakTorque.InNm
-        EntTbl.FlyRPM    = EntTbl.IdleRPM * 1.5
 
         Entity:UpdateSound(EntTbl)
 
@@ -136,6 +143,7 @@ local function SetActive(Entity, Value, EntTbl)
         EntTbl.Torque = 0
 
         Entity:DestroySound()
+        SetStarterActive(EntTbl, false)
 
         TimerRemove("ACF Engine Clock " .. Entity:EntIndex())
     end
@@ -209,6 +217,9 @@ do -- Actual engine rpm and torque calculations
                 SelfTbl.WasTimed = true
             end
             return
+        -- Else start cranking the engine
+        elseif SelfTbl.Active and not SelfTbl.IsStalled and SelfTbl.HasStarter and SelfTbl.FlyRPM < SelfTbl.IdleRPM * 0.5 then
+            SetStarterActive(SelfTbl, SelfTbl.Active)
         end
 
         self:CalcRPM(SelfTbl)
@@ -248,6 +259,11 @@ do -- Actual engine rpm and torque calculations
         local RedlineRPM = SelfTbl.RedlineRPM
         local FlyRPM     = SelfTbl.FlyRPM
 
+        local Starter    = SelfTbl.Starter
+        local SrtTable   = ENTITY.GetTable(Starter)
+
+        local StrTorque  = SrtTable.Torque
+
         -- Determine if the rev limiter will engage or disengage
         local RevLimited = false
         if SelfTbl.RevLimiterEnabled and not IsElectric then
@@ -269,6 +285,11 @@ do -- Actual engine rpm and torque calculations
 
         -- local Throttle = RevLimited and 0 or SelfTbl.Throttle
         local Throttle = RevLimited and 0 or Clamp(SelfTbl.Throttle + (SelfTbl.IdleThrottle + SmoothedIdle * 5), 0, 1)
+
+        -- Turn off the starter if we have reached enough velocity
+        if SrtTable.IsCranking and FlyRPM >= IdleRPM * 0.9 then
+            SetStarterActive(SelfTbl, false)
+        end
 
         -- Calculate fuel usage
         if IsEntityValid(FuelTank) then
@@ -342,14 +363,20 @@ do -- Actual engine rpm and torque calculations
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = max(FlyInertia, GearboxInertia * GearboxLoad)
 
-        local EngineTorque = (Torque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5))) - Friction -- Limited compression brake slip
+        local EngineTorque = (Torque + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5))) - Friction -- Limited compression brake slip
 
         -- Let's accelerate the flywheel based on that torque
         FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia - Friction, 0)
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
-        SelfTbl.State = FlyRPM <= IdleRPM * 0.9 and "Stalling" or "Active"
+        if FlyRPM <= IdleRPM * 0.9 and SrtTable.IsCranking then
+            SelfTbl.State = "Cranking"
+        elseif FlyRPM <= IdleRPM * 0.9 then
+            SelfTbl.State = "Stalling"
+        else
+            SelfTbl.State = "Active"
+        end
         SelfTbl.Torque = Torque
         SelfTbl.Friction = Friction -- Assembly Friction
 
@@ -371,7 +398,7 @@ do -- Actual engine rpm and torque calculations
 
         -- Stall detection: RPM collapsed below the stall threshold while the load exceeded output.
         -- SetActive handles the restart guard; CalcRPM just flags and shuts down.
-        if FlyRPM <= IdleRPM * 0.33 and GearboxTotalRatio == 0 or (FlyRPM <= IdleRPM * 0.33 and TotalReqTq > TorqueDiff) then
+        if FlyRPM <= IdleRPM * 0.33 and (GearboxTotalRatio == 0 and not SrtTable.IsCranking) or (FlyRPM <= IdleRPM * 0.33 and TotalReqTq > TorqueDiff) then
             SelfTbl.IsStalled = true
             SetActive(self, false, SelfTbl)
         end

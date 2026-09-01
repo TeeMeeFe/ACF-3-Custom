@@ -42,6 +42,7 @@ do -- State Handling
         local ClockTime = Clock.CurTime
         local DeltaTime = ClockTime - SelfTbl.LastThink
         local Torque    = max(SelfTbl.Torque, 0)
+        local Throttle  = max(SelfTbl.Throttle, 0.01)
         local RPM       = SelfTbl.FlyRPM or 0
         local IdleRPM   = SelfTbl.IdleRPM
         local AmbTemp   = SelfTbl.AmbientTemp
@@ -52,7 +53,7 @@ do -- State Handling
         local Omega     = (RPM * 2 * PI) * 0.0166667
         local P_fric_kW = (AsmFric * Omega) * 0.001
 
-        local TotalHeat = (ACF.HeatGenerationAtIdle + HeatCoeff) * Torque * DeltaTime * ACF.HeatGenerationScalar
+        local TotalHeat = (ACF.HeatGenerationAtIdle + HeatCoeff) * Torque * Throttle * DeltaTime * ACF.HeatGenerationScalar
 
         -- Actual Thermal Calcs
         local CT = SelfTbl.Temperature.Coolant
@@ -64,22 +65,24 @@ do -- State Handling
 
         local Rads = SelfTbl.Radiators
         for Ent, Link in pairs(Rads) do
-            local EntTable = ENTITY.GetTable(Ent)
+            if IsEntityValid(Ent) then
+                local EntTable = ENTITY.GetTable(Ent)
 
-            if not EntTable.Disabled and EntTable.Active then
-                local Amount          = EntTable.Amount
-                local Capacity        = EntTable.Capacity
+                if not EntTable.Disabled and EntTable.Active then
+                    local Amount          = EntTable.Amount
+                    local Capacity        = EntTable.Capacity
 
-                local CoolantLevel    = Amount / Capacity
-                local CoolantLevelMin = 0.15 -- Coolant level threshold
+                    local CoolantLevel    = Amount / Capacity
+                    local CoolantLevelMin = 0.15 -- Coolant level threshold
 
-                -- Water pump flow. Cavitates if coolant level is critically low
-                local Q = CoolantLevel >= CoolantLevelMin and K_PUMP_FLOW * RPM or 0
-                SelfTbl.WaterPumpFlow = Q
+                    -- Water pump flow. Cavitates if coolant level is critically low
+                    local Q = CoolantLevel >= CoolantLevelMin and K_PUMP_FLOW * RPM or 0
+                    SelfTbl.WaterPumpFlow = Q
 
-                HOCool = Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime)
-            else
-                HOCool = Ent:CalcTemp(CT, 0, 0, DeltaTime)
+                    HOCool = Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime)
+                else
+                    HOCool = Ent:CalcTemp(CT, 0, 0, DeltaTime)
+                end
             end
         end
 
@@ -92,6 +95,7 @@ do -- State Handling
         local HeatToOil  = ACF.HeatFractionToOil * (TotalHeat + P_fric_kW * 0.001) * DeltaTime
 
         -- Sump passive cooling + assembly friction heat added to oil
+        HOCool = HOCool + K_OIL_AMB * (CT - AmbTemp) * DeltaTime
         local HOOil = K_OIL_AMB * (OT - AmbTemp) * DeltaTime
 
         -- Total calculation assignments 

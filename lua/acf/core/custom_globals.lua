@@ -8,7 +8,7 @@ do -- Globals
     ACF.HeatFractionToOil     = 0.30 -- Ratio of the remaining heat that is dissipated through the oil
     -- Heat Generation scalars
     ACF.HeatGenerationAtIdle  = 0.15 -- Ratio as baseline heat/s when the engine is active and idling
-    ACF.HeatGenerationScalar  = 1    -- Scalar (aka multiplier) of heat generated over time. Higher is faster.
+    ACF.HeatGenerationScalar  = 0.45 -- Scalar (aka multiplier) of heat generated over time. Higher is faster.
     -- Unit conversion
     ACF.RPMToRads             = 0.10472 -- RPM to Radians
 end
