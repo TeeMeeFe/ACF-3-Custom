@@ -1,8 +1,8 @@
 local ACF     		= ACF
 local Classes 		= ACF.Classes
+local Notify        = ACF.Utilities.Notify
 
 local GetType 		= Classes.GetTypeByName
-local Round   		= math.Round
 local max           = math.max
 local TimerRemove   = timer.Remove
 local Contraption   = ACF.Contraption
@@ -26,6 +26,7 @@ local function UpdateEngine(Entity, ClassData)
 	local EngineClass = Entity.EngineFuelType
 	local TypeDef     = GetType(EngineClass)
 	local FuelTypes   = GetType(EngineClass).Fuel
+	local StarterType = Entity:ACF_GetUserVar("StarterType")
 
 	local ExtraEngineFields = {
 		PistonSpeed  = TypeDef.PistonSpeed,
@@ -43,9 +44,9 @@ local function UpdateEngine(Entity, ClassData)
 	local Type = TypeDef.ShortName
 	local Name
 	if Displacement.InLiters <= 1 then
-		Name = ("%scc %s - %s"):format(Round(Displacement.InCubicCentimeters, 0), Sign, Type)
+		Name = ("%.0fcc %s - %s"):format(Displacement.InCubicCentimeters, Sign, Type)
 	else
-		Name = ("%sL %s - %s"):format(Round(Displacement.InLiters, 1), Sign, Type)
+		Name = ("%.1fL %s - %s"):format(Displacement.InLiters, Sign, Type)
 	end
 
 	-- Class compute table assignments
@@ -90,6 +91,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.Scale                = Compute.ModelScale
 	Entity.SparksPerRev			= Compute.SparksPerRev
 	Entity.Stroke				= Compute.Stroke
+	Entity.StarterType          = StarterType
 	Entity.SweptVolPerCyl		= Compute.SweptVolPerCyl
 	Entity.Type                 = TypeDef.Name
 	Entity.TorqueSmoothness		= Compute.TorqueSmoothness
@@ -176,8 +178,10 @@ local function OnUpdateEntity(Entity)
 	local SelfTbl = Entity:GetTable()
 	if not SelfTbl.HasStarter then return end
 
+	local StarterData = Entity:GetStarterType()
+
 	-- Rebuild the starter.
-	if not IsValid(SelfTbl.Starter) then
+	if not IsValid(SelfTbl.Starter) and Entity.Displacement.InLiters < StarterData.MaxDisplacement then
 		local Starter = ents.Create("acf_starter")
 
 		if not IsValid(Starter) then
@@ -198,17 +202,38 @@ local function OnUpdateEntity(Entity)
 		Starter:SetRenderMode(RENDERMODE_NONE)
 		Starter:SetNotSolid(true)
 		Starter:DrawShadow(false)
-
+		Starter:SetOwner(Entity:GetOwner())
 		Starter:ACF_PostSpawn()
 
+		local Params = {
+			IdleRPM      = SelfTbl.IdleRPM,
+			IgnitionType = SelfTbl.IgnitionType,
+			Displacement = SelfTbl.Displacement,
+		}
+
+		local Compute = StarterData.Compute(_, _, Params)
+
 		-- Starters are incorporated into the engines that have them, this also means there's increased mass as well
-		local IncreasedMass = 5 * SelfTbl.Scale[1]
+		local IncreasedMass = 25 * Compute.ScaledMass
 		Contraption.SetMass(Entity, SelfTbl.Mass + IncreasedMass)
 
-		SelfTbl.Starter = Starter
-		Starter.TorqueStall = 1.1 * SelfTbl.Scale[1]
-		Starter.Engine  = Entity
-		Starter.Owner   = Entity
+		SelfTbl.Starter     = Starter
+
+		Starter.TorqueStall = Compute.TorqueStall * SelfTbl.Scale[1]
+		Starter.SoundPath   = StarterData.SoundPath
+		Starter.Engine      = Entity
+		Starter.Owner       = Entity
+	elseif Entity.Displacement.InLiters >= StarterData.MaxDisplacement then
+		local Starter = SelfTbl.Starter
+
+		if IsValid(Starter) then
+			local Owner = Starter:CPPIGetOwner()
+
+			Notify.EntityWarningToPlayer(Starter, Owner, "Removing starter from engine!", "Engine exceeds maximum specified displacement for its starter.")
+			Starter:RemoveSafely()
+
+			Entity:UpdateOverlay()
+		end
 	end
 end
 

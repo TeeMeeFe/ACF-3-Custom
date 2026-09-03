@@ -14,6 +14,10 @@ ACF.Entities.AutoRegisterV2(function(CLASS)
         OnlyAllowSubtypes = true,
         InstantiateTypeForDefault = "ACF.CustomEngineTypes.GenericPetrol"
     })
+    MENU_FIELD("ACF.CustomEngines.ElectricBlock", "StarterType", {
+        OnlyAllowSubtypes = true,
+        InstantiateTypeForDefault = "ACF.CustomEngines.StarterMotor"
+    })
 
     MENU_FIELD("String", "CustomEngineModel",      {Default = "models/engines/inline4s.mdl"})
     MENU_FIELD("Number", "CustomEnginePistons",    {Min = 1,    Max = 16,  Default = 4,   Decimals = 0, IsEvenNumber = true})
@@ -49,4 +53,8 @@ ENT.ACF_StaticWireOutputs = {
 
 function ENT:GetBlockType()
     return self:ACF_GetUserVar("BlockType")
+end
+
+function ENT:GetStarterType()
+    return self:ACF_GetUserVar("StarterType")
 end

@@ -11,6 +11,8 @@ do -- Globals
     ACF.HeatGenerationScalar  = 0.45 -- Scalar (aka multiplier) of heat generated over time. Higher is faster.
     -- Unit conversion
     ACF.RPMToRads             = 0.10472 -- RPM to Radians
+
+    ACF.FrictionalRPMExponent = 0.6  -- Reference exponent of total rotating assembly friction that increases with RPM. 
 end
 
 do -- Update checker

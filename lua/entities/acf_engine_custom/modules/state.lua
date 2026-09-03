@@ -358,6 +358,8 @@ do -- Actual engine rpm and torque calculations
         local PMEP = 25 -- bar; Tune this bitch 
         local CompressionBrakeTorque = -(PMEP * SelfTbl.Displacement.InLiters / (4 * PI)) * SelfTbl.CompressionRatio * (1 - Throttle)
 
+        SelfTbl.CompressionBrakeTorque = CompressionBrakeTorque
+
         local SlipDifference = GearboxRPM - FlyRPM
         local MaxTq = (abs(SlipDifference) * GearboxInertia) / max(GearboxTotalRatio, 0.001)
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
@@ -366,7 +368,7 @@ do -- Actual engine rpm and torque calculations
         local EngineTorque = (Torque + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5))) - Friction -- Limited compression brake slip
 
         -- Let's accelerate the flywheel based on that torque
-        FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia - Friction, 0)
+        FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia, 0)
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
@@ -393,7 +395,6 @@ do -- Actual engine rpm and torque calculations
             Link:TransferGearbox(Ent, Link.ReqTq * AvailRatio * MassRatio, DeltaTime, MassRatio, FlyRPM)
         end
 
-        -- SelfTbl.FlyRPM = FlyRPM - min(TorqueDiff, TotalReqTq) / IncomingInertia
         SelfTbl.FlyRPM = FlyRPM
 
         -- Stall detection: RPM collapsed below the stall threshold while the load exceeded output.

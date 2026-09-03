@@ -21,14 +21,13 @@ function Custom.BuildTorqueCurve(TorqueCurve, MaxTorque, MaxRPM, IdleRPM, Displa
     -- Constants
     local POWER_BAND_THRESHOLD = 0.8 -- Fraction of peak power that defines the band edges
     local REDLINE_TORQUE_FRAC  = 0.4 -- Fraction of remaining torque past its peak where we setup the redline RPM limiter
-    local FRICTION_RPM_EXP     = 0.6 -- Reference exponent of total rotating assembly friction that increases with RPM. 
 
     local FRICTION_FMEP_BAR    = 0.52 -- Reference Friction Mean Effective Pressure in bar, at idleRPM. 
                                     -- This increases proportionally with RPM and inversely with oil temperature,
                                     -- and we make a reference value by scaling with displacement and idle rpm. 
                                     -- Props to https://x-engineer.org/mechanical-efficiency-friction-mean-effective-pressure-fmep/
     local FRICTION_TORQUE_REF  = (FRICTION_FMEP_BAR * 1e5) * (Displacement * 1e-3) / (4 * PI) -- ≈ 7.45 Nm for a 1.8L, 850RPM idle, NA engine, be it any layout.
-    local FRICTION_K_FRIC      = FRICTION_TORQUE_REF / (IdleRPM ^ FRICTION_RPM_EXP * Displacement)
+    local FRICTION_K_FRIC      = FRICTION_TORQUE_REF / (IdleRPM ^ ACF.FrictionalRPMExponent * Displacement)
 
     local TWO_PI_OVER_60       = 2 * PI / 60
 
@@ -55,7 +54,7 @@ function Custom.BuildTorqueCurve(TorqueCurve, MaxTorque, MaxRPM, IdleRPM, Displa
         local Val0  = TorqueCurve[Idx0 + 1] or 0
         local Val1  = TorqueCurve[Idx1 + 1] or 0
         T_Curve[I]  = MaxTorque * (Val0 + blend * (Val1 - Val0)) -- torque curve
-        F_Curve[I]  = FRICTION_K_FRIC * (T_Curve[I] ^ FRICTION_RPM_EXP) * Displacement -- friction curve
+        F_Curve[I]  = FRICTION_K_FRIC * (T_Curve[I] ^ ACF.FrictionalRPMExponent) * Displacement -- friction curve
 
         -- Get the i-th points
         local RPM_I    = MaxRPM * I / Steps

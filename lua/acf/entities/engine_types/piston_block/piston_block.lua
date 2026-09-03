@@ -302,6 +302,8 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
 
             local SubPanel = SubMenu:AddPanel("ACF_Panel")
 
+            local CanHaveStarter = true
+
             local function BuildMenu(SUPER, SuperMenu)
                 local EngineDescLabel
                 local BankAnglePanel
@@ -313,9 +315,13 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                 local BoreOpts      = Classes.GetTypeFieldByName(SUPER, "CustomEngineBore").Options
                 local StrokeOpts    = Classes.GetTypeFieldByName(SUPER, "CustomEngineStroke").Options
                 local ClearanceOpts = Classes.GetTypeFieldByName(SUPER, "CustomEngineClearance").Options
+                local StarterOpts   = Classes.GetTypeFieldByName(SUPER, "StarterType").Options
+
+                -- Fetch the starter field data
+                local StarterFields = Classes.GetTypeByName(StarterOpts.InstantiateTypeForDefault)
 
                 -- Local functions just to update our labels
-                local function UpdatePreview(Panel)
+                local function UpdatePreview(Panel, Displacement)
                     local ClassModel = SUPER.Model
                     local Pistons = Clamp(Engine:Get("CustomEnginePistons"), PistonOpts.Min, PistonOpts.Max)
 
@@ -324,6 +330,9 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
 
                     local Model = Engine:Get("CustomEngineModel") or ModelOpts.Default
                     Panel:UpdateModel(Model)
+
+                    local Scale = 1.08 * pow(Displacement, 0.30)
+                    Panel:SetModelScale(Scale, true)
                 end
 
                 local function UpdateEngineStats(Panel, Pistons, Bore, Stroke, Clearance)
@@ -345,6 +354,8 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                                     \nDisplacement: %s L"):format(CRatio, V_swept, V_displ)
 
                     Panel:SetText(Label)
+
+                    return V_displ, V_swept, CRatio
                 end
 
                 local BankAngle = Classes.GetTypeFieldByName(SUPER, "CustomEngineBankAngle")
@@ -353,7 +364,7 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                 local BankAmount = Classes.GetTypeFieldByName(SUPER, "CustomEngineBankAmount")
                 local BankAmountOpts = BankAmount and BankAmount.Options
 
-                local EngineBase = SuperMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor_edit.png")
+                local EngineBase = SuperMenu:AddCollapsible("#acf.menu.engines.engine_info", nil, "icon16/monitor.png")
                 local EngineName = EngineBase:AddTitle()
                 local EngineDesc = EngineBase:AddLabel()
 
@@ -380,8 +391,8 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     self:SetValue(Value)
                     Engine:Set("CustomEnginePistons", Value)
 
-                    UpdatePreview(EnginePreview)
-                    UpdateEngineStats(EngineDescLabel, Value)
+                    local Displacement = UpdateEngineStats(EngineDescLabel, Value)
+                    UpdatePreview(EnginePreview, Displacement)
                 end
 
                 local BorePanel = EngineConfig:AddSlider("Piston Bore Size (cm)", BoreOpts.Min, BoreOpts.Max, BoreOpts.Decimals)
@@ -392,7 +403,8 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     self:SetValue(Value)
                     Engine:Set("CustomEngineBore", Value)
 
-                    UpdateEngineStats(EngineDescLabel, nil, Value)
+                    local Displacement = UpdateEngineStats(EngineDescLabel, nil, Value)
+                    UpdatePreview(EnginePreview, Displacement)
                 end
 
                 local StrokePanel = EngineConfig:AddSlider("Piston Stroke Size (cm)", StrokeOpts.Min, StrokeOpts.Max, StrokeOpts.Decimals)
@@ -406,7 +418,8 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     self:SetValue(Value)
                     Engine:Set("CustomEngineClearance", Value)
 
-                    UpdateEngineStats(EngineDescLabel, nil, nil, nil, Value)
+                    local Displacement = UpdateEngineStats(EngineDescLabel, nil, nil, nil, Value)
+                    UpdatePreview(EnginePreview, Displacement)
                 end
 
                 function StrokePanel:OnValueChanged(Value)
@@ -438,8 +451,18 @@ Classes.DefineClass("ACF.CustomEngines.PistonBlock", "ACF.CustomEngines.BaseEngi
                     end
                 end
 
-                UpdatePreview(EnginePreview)
-                UpdateEngineStats(EngineDescLabel)
+                local StarterConfig = SuperMenu:AddCollapsible("Starter Info", nil, "icon16/shape_square_edit.png")
+                local StarterPreview = StarterConfig:AddModelPreview(StarterFields.Model, true, "Tertiary")
+                local StarterChckBox = StarterConfig:AddCheckBox("Has starter")
+                StarterChckBox:GetValue(Engine:Get("HasStarter"))
+                function StarterChckBox:OnValueChanged(Value)
+                    Engine:Set("HasStarter", Value)
+                    self:SetValue(Value)
+                end
+
+
+                local Displacement = UpdateEngineStats(EngineDescLabel)
+                UpdatePreview(EnginePreview, Displacement)
             end
 
             function EngineClass:OnSelect(Index, _, Data)

@@ -5,7 +5,6 @@ ENT.OverlayDelay = 0.1
 function ENT:ACF_UpdateOverlayState(State)
     local TorqueMult = self.GetTorqueMult() -- Janky i know, but i gotta get this to work first.
     local DamageMult = self.TorqueDamageMult
-    local CompressionRatio = Round(self.CompressionRatio, 1)
 
     local PeakPower  = {InKW = Round(self.PeakPower.InKW * TorqueMult * DamageMult),
                         InHP = Round(self.PeakPower.InHP * TorqueMult * DamageMult),
@@ -18,8 +17,6 @@ function ENT:ACF_UpdateOverlayState(State)
     local PowerBand  = {Min = Round(self.PowerBand.Min),
                         Max = Round(self.PowerBand.Max),
                         Width = Round(self.PowerBand.Band)}
-
-    local RedlineRPM = Round(self.RedlineRPM)
 
     State:AddHeader(self.Name, 2)
     if not IsValid(self.Starter) and self.HasStarter then
@@ -36,9 +33,9 @@ function ENT:ACF_UpdateOverlayState(State)
     -- Unit conversion on bore and stroke, from Centimeters to Millimeters
     State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))
     State:AddKeyValue("Stroke", ("%s mm"):format(self.Stroke * 10))
-    State:AddKeyValue("Compression Ratio", ("%s:1"):format(CompressionRatio))
+    State:AddKeyValue("Compression Ratio", ("%.0f:1"):format(self.CompressionRatio))
     State:AddKeyValue("Power", ("%s kW / %s hp @%s RPM"):format(PeakPower.InKW, PeakPower.InHP, PeakPower.AtRPM))
     State:AddKeyValue("Torque", ("%s Nm / %s ft-lb @%s RPM"):format(PeakTorque.InNm, PeakTorque.InFtLb, PeakTorque.AtRPM))
     State:AddKeyValue("Powerband", ("%s - %s RPM  Δ%s RPM"):format(PowerBand.Min, PowerBand.Max, PowerBand.Width))
-    State:AddKeyValue("Redline", ("%s RPM"):format(RedlineRPM))
+    State:AddKeyValue("Redline", ("%.0f RPM"):format(self.RedlineRPM))
 end

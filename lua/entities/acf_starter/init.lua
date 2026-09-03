@@ -18,10 +18,10 @@ function ENT:ACF_PostSpawn()
     self.LastTorque   = 0
     self.InputVoltage = 12 -- TODO: This would read from a battery instead of being constant
     self.LastVoltage  = 0
-    self.SoundPath    = "acf_custom/starter/ignition_loop.wav"
     self.SoundPitch   = 1
     self.LastPitch    = 0
     self.SoundVolume  = 1
+    self.RemoveParent = true -- If false, it just removes this entity.
 end
 
 function ENT:SetActive(Active)
@@ -77,11 +77,12 @@ function ENT:Think()
     local Engine = (SelfTbl.Engine):GetTable()
     local FlyRPM = Engine.FlyRPM
 
-    if SelfTbl.IsCranking and (SelfTbl.Torque ~= SelfTbl.LastTorque or SelfTbl.Torque == 0) then
-        SelfTbl.Torque = SelfTbl.TorqueStall * SelfTbl.InputVoltage
+    if SelfTbl.IsCranking then
+        -- This roughly creates the electric motor torque-curve, full torque at 0 RPM, and linearly dropping to 0 at LimitRPM.
+        local SpeedFrac = Clamp(FlyRPM / SelfTbl.LimitRPM, 0, 1)
+        SelfTbl.Torque = SelfTbl.TorqueStall * SelfTbl.InputVoltage * (1 - SpeedFrac)
         SelfTbl.LastTorque = SelfTbl.Torque
-
-    elseif not SelfTbl.IsCranking and SelfTbl.Torque ~= 0 then
+    elseif SelfTbl.Torque ~= 0 then
         SelfTbl.Torque = 0
         SelfTbl.LastTorque = 0
     end
@@ -91,18 +92,26 @@ function ENT:Think()
     end
 end
 
+function ENT:RemoveSafely()
+    local Parent = self.Engine:GetTable()
+
+    Parent.Starter = nil
+    self.RemoveParent = false
+    self:Remove()
+end
+
 -- One can't exist without the other
 function ENT:OnRemove()
-    if IsValid(self.Engine) then
+    if IsValid(self.Engine) and self.RemoveParent then
         self.Engine:Remove()
     end
 end
 
--- This shouldn't be called usually due to parent detouring, but in the offchance that this is ever directly unparented from the turret ring, destroy it and the turret entity since it is no longer a valid turret
+-- This shouldn't be called usually due to parent detouring.
 function ENT:CFW_OnParented(Entity, Connected)
     if not IsValid(Entity) then return end
 
-    if Connected == false and Entity == self.Engine then self:Remove() end
+    if Connected == false and (Entity == self.Engine and self.RemoveParent) then self:Remove() end
 end
 
 function ENT:UpdateTransmitState()

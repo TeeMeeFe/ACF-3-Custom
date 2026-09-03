@@ -22,6 +22,11 @@ Classes.DefineClass("ACF.CustomEngines.InlineEngine", "ACF.CustomEngines.PistonB
     MENU_FIELD("String", "CustomEngineCylinderHead", {Default = "Pushrod"})
     MENU_FIELD("String", "CustomEngineCamshaftType", {Default = "Stock"})
 
+    FIELD("ACF.CustomEngines.ElectricBlock", "StarterType", {
+        OnlyAllowSubtypes = true,
+        InstantiateTypeForDefault = "ACF.CustomEngines.StarterMotor"
+    })
+
     function CLASS.GetLayoutFactors(Pistons)
         if not Pistons then return end
 
