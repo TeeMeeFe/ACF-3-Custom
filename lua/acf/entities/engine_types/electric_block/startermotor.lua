@@ -48,7 +48,8 @@ ACF.Classes.DefineClass("ACF.CustomEngines.StarterMotor", "ACF.CustomEngines.Ele
 
         return {
             TorqueStall = TorqueStall,
-            ScaledMass = ModelMass
+            ScaledMass = ModelMass,
+            CrankRPM = CrankRPM
         }
     end
 

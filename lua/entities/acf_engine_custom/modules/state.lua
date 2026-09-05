@@ -45,11 +45,30 @@ local function GetNextFuelTank(Engine)
     return Select:CanConsume() and Select or nil
 end
 
+-- Get the volume of the fuel pipeline
+local function GetPipelineVolume(PipeLength, PipeSize)
+    return (PI / 4) * PipeSize * PipeSize * PipeLength / 1000 -- in mL
+end
+
+-- Get the nearest fuel tank, to calculate pipeline pressure build/decay
+local function GetClosestFuelTank(Engine)
+    local Length = math.huge
+    for _, Dist in pairs(Engine.FuelLinkDistances) do
+        if Dist < Length then
+            Length = Dist
+        end
+    end
+    return Length
+end
+
 local function CheckDistantFuelTanks(Engine)
     local EnginePos = Engine:GetPos()
 
     for Tank in pairs(Engine.FuelTanks) do
-        if EnginePos:DistToSqr(Tank:GetPos()) > MaxDistance then
+        local Distance = EnginePos:DistToSqr(Tank:GetPos())
+
+        Engine.FuelLinkDistances[Tank] = Distance
+        if Distance > MaxDistance then
             local Sound = UnlinkGbxSound:format(random(1, 3))
 
             Sounds.SendSound(Engine, Sound, 70, 100, 1)
@@ -122,6 +141,15 @@ local function SetActive(Entity, Value, EntTbl)
         Entity:UpdateSound(EntTbl)
 
         Entity:NextThink(Clock.CurTime + TickInterval())
+
+        -- Fuel rail pressure calc.
+        local FuelLength = GetClosestFuelTank(Entity)
+        local PipelineVol = GetPipelineVolume(Clamp(FuelLength, 1, MaxDistance), EntTbl.PipeRefSize)
+        local PressureBuildRate = min(EntTbl.PumpFlow / PipelineVol, 1)
+        local PressureDecayRate = min(PipelineVol / EntTbl.PipeLeakRate, PressureBuildRate * 2)
+
+        EntTbl.RailBuildRate = PressureBuildRate
+        EntTbl.RailDecayRate = PressureDecayRate
 
         TimerCreate("ACF Engine Clock " .. Entity:EntIndex(), 3, 0, function()
             if not IsEntityValid(Entity) then return end
@@ -206,13 +234,16 @@ do -- Actual engine rpm and torque calculations
         local SelfTbl = ENTITY.GetTable(self)
         if SelfTbl.Disabled then return end
 
-        -- Keep updating temps even if the radiator is off
+        -- Keep updating temps and pressure even if the radiator is off
         if not SelfTbl.Active then
             if not SelfTbl.WasTimed then
                 TimerCreate("ACF Temperature Clock " .. self:EntIndex(), 1, 0, function()
-                    self:CalcTemp(SelfTbl)
-                    SelfTbl.LastThink = Clock.CurTime
-                    SelfTbl.UpdateOutputs(self, SelfTbl)
+                    if not SelfTbl.Active then
+                        self:CalcTemp(SelfTbl)
+                        SelfTbl.RailPressure = max(SelfTbl.RailPressure - ((Clock.CurTime - SelfTbl.LastThink) * SelfTbl.RailDecayRate), 0) -- Update rail pressure too
+                        SelfTbl.LastThink = Clock.CurTime
+                        SelfTbl.UpdateOutputs(self, SelfTbl)
+                    end
                 end)
                 SelfTbl.WasTimed = true
             end
@@ -242,8 +273,8 @@ do -- Actual engine rpm and torque calculations
         -- This helps to massively improve performance throughout the entire drivetrain
         SelfTbl = SelfTbl or ENTITY.GetTable(self)
 
-        local ClockTime  = Clock.CurTime
-        local DeltaTime  = ClockTime - SelfTbl.LastThink
+        local ClockTime = Clock.CurTime
+        local DeltaTime = ClockTime - SelfTbl.LastThink
 
         -- Due to the temperature clock, every one second it'll synchronize the DeltaTime to our ClockTime,
         -- so we have to return early to avoid some issues downstream. This doesn't mean this tick will be wasted,
@@ -283,7 +314,6 @@ do -- Actual engine rpm and torque calculations
         local SmoothedIdle = SelfTbl.IdleThrottle - SelfTbl.LastIdleThrottle
         SelfTbl.LastIdleThrottle = SelfTbl.IdleThrottle
 
-        -- local Throttle = RevLimited and 0 or SelfTbl.Throttle
         local Throttle = RevLimited and 0 or Clamp(SelfTbl.Throttle + (SelfTbl.IdleThrottle + SmoothedIdle * 5), 0, 1)
 
         -- Turn off the starter if we have reached enough velocity
@@ -308,20 +338,18 @@ do -- Actual engine rpm and torque calculations
             return 0
         end
 
+        -- Update rail pressure
+        SelfTbl.RailPressure = min(SelfTbl.RailPressure + SelfTbl.RailBuildRate * DeltaTime, 1)
+        SelfTbl.FuelPrimed   = SelfTbl.RailPressure >= 0.70  -- Fraction of full pressure considered "primed"
+
         -- Calculate the current torque from flywheel RPM
         local Torque, Friction = 0, SelfTbl.Friction or 0
-
-        -- local PeakRPM    = IsElectric and SelfTbl.FlywheelOverride or SelfTbl.PowerBand.Max
         local FlyInertia = SelfTbl.FlywheelInertia
-        -- local PeakTorque = SelfTbl.PeakTorque.InNm
 
-        -- if Throttle ~= 0 and FlyRPM < LimitRPM then
         if FlyRPM < LimitRPM then
             local Sample = SelfTbl.Sample(FlyRPM)
-            Torque = Throttle * Sample[1] * TorqueMult * DamageMult
+            Torque = SelfTbl.FuelPrimed and Throttle * Sample[1] * TorqueMult * DamageMult or 0
             Friction = Sample[2]
-        else
-            Torque = 0
         end
 
         -- The gearboxes don't think on their own, it's the engine that calls them, to ensure consistent execution order
@@ -374,7 +402,7 @@ do -- Actual engine rpm and torque calculations
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
         if FlyRPM <= IdleRPM * 0.9 and SrtTable.IsCranking then
             SelfTbl.State = "Cranking"
-        elseif FlyRPM <= IdleRPM * 0.9 then
+        elseif FlyRPM <= IdleRPM * 0.9 and not SrtTable.IsCranking then
             SelfTbl.State = "Stalling"
         else
             SelfTbl.State = "Active"

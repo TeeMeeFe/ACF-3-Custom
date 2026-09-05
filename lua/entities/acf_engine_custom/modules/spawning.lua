@@ -4,6 +4,7 @@ local Notify        = ACF.Utilities.Notify
 
 local GetType 		= Classes.GetTypeByName
 local max           = math.max
+local min           = math.min
 local TimerRemove   = timer.Remove
 local Contraption   = ACF.Contraption
 local IsEntityValid = ACF.Optimizations.IsEntityValid
@@ -49,6 +50,13 @@ local function UpdateEngine(Entity, ClassData)
 		Name = ("%.1fL %s - %s"):format(Displacement.InLiters, Sign, Type)
 	end
 
+	-- This assumes scale is an absolute value, when it really isn't...
+	local ModelScale = Compute.ModelScale
+
+	local PumpFlow = 20 * ModelScale             -- in mL/s, reference pump flow of 20 mL/s at Scale=1
+	local PipeSize = min(8 * ModelScale, 1.5)    -- in mm, reference inner diameter of 8 mm at Scale=1, clamped
+	local LeakRate = min(0.15 * ModelScale, 0.1) -- in mL/s, reference fuel leak rate of the pipeline at Scale=1, clamped
+
 	-- Class compute table assignments
 	Entity.ACF.Model 		    = Model
 	Entity.Name      			= Name
@@ -74,13 +82,16 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.IdleRPM				= Compute.IdleRPM
 	Entity.IsStalled			= false
 	Entity.Layout				= Compute.Layout
+	Entity.PipeLeakRate         = LeakRate
 	Entity.Mass                 = Compute.ScaledMass
 	Entity.LimitRPM   		    = Compute.LimitRPM
 	Entity.OilSumpTilt  		= Compute.OilSumpTilt
 	Entity.PeakTorque			= Compute.PeakTorque
 	Entity.PeakPower			= Compute.PeakPower
 	Entity.PowerBand			= Compute.PowerBand
+	Entity.PipeRefSize          = PipeSize
 	Entity.Pistons 				= Compute.Pistons
+	Entity.PumpFlow             = PumpFlow
 	Entity.RodRatio				= Compute.RodRatio
 	Entity.RedlineRPM           = Compute.RedlineRPM
 	Entity.RevLimited			= false
@@ -88,7 +99,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.SoundVolume        	= Entity.SoundVolume or 1
 	Entity.Sign 				= Sign
 	Entity.Sample				= Compute.Sample
-	Entity.Scale                = Compute.ModelScale
+	Entity.Scale                = ModelScale
 	Entity.SparksPerRev			= Compute.SparksPerRev
 	Entity.Stroke				= Compute.Stroke
 	Entity.StarterType          = StarterType
@@ -134,11 +145,13 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.ExhaustEntity 		= nil
 	self.FuelTypes			= {}
 	self.FuelTanks     		= {}
+	self.FuelLinkDistances  = {}
 	self.Gearboxes     		= {}
 	self.Radiators     		= {}
 	self.HasStarter         = true -- TODO: true for now, it should be a uservar
 	self.Starter            = nil
 	self.Friction           = 0
+	self.FuelPrimed         = false
 	self.MassRatio     		= 1
 	self.LastThink     		= 0
 	self.LastTorque    		= 0
@@ -159,6 +172,9 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.IsStalled		    = false
 	self.State         		= "Idle"
 	self.SoundBanks    		= {}
+	self.RailPressure       = 0
+	self.RailBuildRate      = 0
+	self.RailDecayRate      = 0
 	self.RevLimiterEnabled 	= true
 	self.LastCoolantTemp    = AmbientTemperature
 	self.LastOilTemp        = AmbientTemperature
@@ -221,6 +237,8 @@ local function OnUpdateEntity(Entity)
 
 		Starter.TorqueStall = Compute.TorqueStall * SelfTbl.Scale[1]
 		Starter.SoundPath   = StarterData.SoundPath
+		Starter.NominalRPM  = Compute.CrankRPM
+		Starter.LimitRPM    = Starter.NominalRPM * Starter.TorqueStall
 		Starter.Engine      = Entity
 		Starter.Owner       = Entity
 	elseif Entity.Displacement.InLiters >= StarterData.MaxDisplacement then

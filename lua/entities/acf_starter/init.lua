@@ -12,8 +12,6 @@ local ENTITY = FindMetaTable("Entity")
 function ENT:ACF_PostSpawn()
     self.State        = "Idle"
     self.IsCranking   = false
-    self.NominalRPM   = 350 -- RPM at which our starter normally runs at 
-    self.LimitRPM     = 700
     self.Torque       = 0
     self.LastTorque   = 0
     self.InputVoltage = 12 -- TODO: This would read from a battery instead of being constant
@@ -36,9 +34,8 @@ function ENT:SetActive(Active)
 end
 
 local function GetPitchVolume(Starter, RPM)
-    local Pitch = Clamp(20 + (RPM * Starter.SoundPitch * 1.5), 1, 100)
-    -- Rev limiter code disabled because it has issues with the volume delta time, but it's still here if we need it
-    local Volume = 0.25 + (0.1 + 0.9 * ((RPM / Starter.LimitRPM) ^ 1.5)) * 0.666
+    local Pitch = Clamp(20 + (RPM * Starter.SoundPitch * 0.9), 1, 100)
+    local Volume = Clamp((0.9 * ((RPM / Starter.NominalRPM) ^ -0.3)) * 0.666, 0, 1)
 
     return Pitch, Volume
 end
@@ -79,7 +76,7 @@ function ENT:Think()
 
     if SelfTbl.IsCranking then
         -- This roughly creates the electric motor torque-curve, full torque at 0 RPM, and linearly dropping to 0 at LimitRPM.
-        local SpeedFrac = Clamp(FlyRPM / SelfTbl.LimitRPM, 0, 1)
+        local SpeedFrac = Clamp(FlyRPM / SelfTbl.NominalRPM, 0, 1)
         SelfTbl.Torque = SelfTbl.TorqueStall * SelfTbl.InputVoltage * (1 - SpeedFrac)
         SelfTbl.LastTorque = SelfTbl.Torque
     elseif SelfTbl.Torque ~= 0 then

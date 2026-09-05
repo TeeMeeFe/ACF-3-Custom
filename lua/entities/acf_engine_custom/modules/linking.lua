@@ -13,9 +13,12 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_fueltank_custom", function(Engin
     if Target.Engines[Engine] then return false, "This engine is already linked to this fuel tank!" end
     if not Engine.FuelTypes[TargetFuelType] then return false, "Cannot link because fuel type is incompatible." end
     if Target.NoLinks then return false, "This fuel tank doesn't allow linking." end
-    if Engine:GetPos():DistToSqr(Target:GetPos()) > MaxDistance then return false, "This fuel tank is too far away from this engine." end
+    local Distance = Engine:GetPos():DistToSqr(Target:GetPos())
+
+    if Distance > MaxDistance then return false, "This fuel tank is too far away from this engine." end
 
     Engine.FuelTanks[Target] = true
+    Engine.FuelLinkDistances[Target] = Distance -- This gets recalculated right after anyway, we only care about the entity being linked.
     Target.Engines[Engine] = true
 
     Engine:UpdateOverlay()
@@ -33,6 +36,7 @@ ACF.RegisterClassUnlink("acf_engine_custom", "acf_fueltank_custom", function(Eng
         end
 
         Engine.FuelTanks[Target] = nil
+        Engine.FuelLinkDistances[Target] = nil
         Target.Engines[Engine]	 = nil
 
         Engine:UpdateOverlay()
@@ -108,6 +112,7 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_radiator", function(Engine, Targ
 
     Engine.Radiators[Target] = true
     Target.Engine = Engine
+    Target.Active = Engine.Active -- Hot-Activate the radiator
 
     Engine:UpdateOverlay()
     Target:UpdateOverlay()
@@ -124,6 +129,7 @@ ACF.RegisterClassUnlink("acf_engine_custom", "acf_radiator", function(Engine, Ta
 
     Engine.Radiators[Target] = nil
     Target.Engine = nil
+    Target.Active = false -- Deactivate the radiator
 
     Engine:UpdateOverlay()
     Target:UpdateOverlay()
