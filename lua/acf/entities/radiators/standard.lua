@@ -81,6 +81,7 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
 
         local ScaleOpts = Classes.GetTypeFieldByName(ClassData, "RadiatorScale").Options
         local MixOpts   = Classes.GetTypeFieldByName(ClassData, "CoolantMix").Options
+        local ThermOpts = Classes.GetTypeFieldByName(ClassData, "ThermostatTemp").Options
 
         local BasePreview = SubMenu:AddCollapsible("Radiator Info", nil, "icon16/monitor_edit.png")
         local RadiatorName = BasePreview:AddTitle()
@@ -174,8 +175,15 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
 
         MixtureLabel = BasePreview:AddLabel()
 
+        local ThermostatPanel = BasePreview:AddSlider("Thermostat open at °C:", ThermOpts.Min, ThermOpts.Max, ThermOpts.Decimals)
+        ThermostatPanel:SetValue(ContextData:Get("ThermostatTemp") or ThermOpts.Default)
+        function ThermostatPanel:OnValueChanged(Value)
+            ContextData:Set("ThermostatTemp", Value)
+        end
+
         -- Gotta create these at the end cause otherwise they would end up way above where i want them.
-        local StatsMenu = SubMenu:AddCollapsible("Radiator Stats", nil, "icon16/monitor_edit.png")
+        local StatsMenu = SubMenu:AddCollapsible("Radiator Stats", nil, "icon16/monitor.png")
+        StatsMenu:DockPadding(0, 4, 0, 16)
         CoolCapLabel    = StatsMenu:AddLabel()
         DensityLabel    = StatsMenu:AddLabel()
         ConductLabel    = StatsMenu:AddLabel()

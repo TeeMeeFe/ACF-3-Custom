@@ -5,10 +5,11 @@ local abs = math.abs
 function ENT:ACF_UpdateOverlayState(State)
     if self.Active then
         State:AddSuccess("Active")
+    elseif not self.Active and not IsValid(self.Engine) then
+        State:AddWarning("Idle, and not linked to an engine!")
     else
         State:AddWarning("Idle")
     end
-
     if self.IsLeaking and self.Leaking > 0 then
         State:AddWarning("WARNING: Leaking!")
     end

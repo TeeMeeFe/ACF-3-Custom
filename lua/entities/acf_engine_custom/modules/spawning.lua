@@ -126,6 +126,7 @@ local function UpdateEngine(Entity, ClassData)
 		Entity.FuelUse = ACF.FuelRate * Entity.BSFC -- * 3e-8 -- This forces any engine to consume literal nanoliters lol.
 	--end
 
+	Entity:UpdateOutputs()
 	WireLib.TriggerOutput(Entity, "State", "Idle")
 
 end

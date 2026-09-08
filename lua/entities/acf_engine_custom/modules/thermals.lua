@@ -1,22 +1,16 @@
 local ACF = ACF
-local Clock         = ACF.Utilities.Clock
+local Clock          = ACF.Utilities.Clock
+local Contraption    = ACF.Contraption
 
-local ENTITY        = FindMetaTable("Entity")
-local IsEntityValid	= ACF.Optimizations.IsEntityValid
+local ENTITY         = FindMetaTable("Entity")
+local PHYSOBJ        = FindMetaTable("PhysObj")
+
+local IsEntityValid	 = ACF.Optimizations.IsEntityValid
+local IsPhysObjValid = ACF.Optimizations.IsPhysObjValid
 
 --===============================================================================================--
 -- Constants 
 --===============================================================================================--
-
--- Coolant thresholds (°C)
--- local COOL_OPTIMAL    = 88
--- local COOL_WARN       = 105
--- local COOL_MAX        = 120
-
--- -- Oil thresholds (°C)
--- local OIL_OPTIMAL     = 90
--- local OIL_WARN        = 130
--- local OIL_MAX         = 160
 
 -- Water pump: Q (L/s) = K_PUMP_FLOW × RPM
 -- 0.667 L/s at 3 000 RPM (≈ 40 L/min automotive spec)
@@ -25,9 +19,6 @@ local K_PUMP_FLOW       = 0.667 / 3000
 -- Oil passive cooling
 -- K_OIL_AMB × (90 - 20) = HEAT_IDLE_GAIN × HEAT_FRAC_OIL = 0.045
 local K_OIL_AMB         = 0.045 / 70  -- 6.43e-4
-
--- Oil↔coolant exchange (scales with RPM)
-local K_OC_BASE         = 0.001 -- game-units/(s·K) when active and at idle
 
 --===============================================================================================--
 -- Local Funcs and Vars
@@ -38,29 +29,38 @@ local max = math.max
 do -- State Handling
     function ENT:CalcTemp(SelfTbl)
         SelfTbl = SelfTbl or ENTITY.GetTable(self)
+        if SelfTbl.Disabled then return end
 
         local ClockTime = Clock.CurTime
         local DeltaTime = ClockTime - SelfTbl.LastThink
-        local Torque    = max(SelfTbl.Torque, 0)
         local Throttle  = max(SelfTbl.Throttle, 0.01)
         local RPM       = SelfTbl.FlyRPM or 0
+        local Power     = max(SelfTbl.Torque * RPM / 9548.8, 0)
         local IdleRPM   = SelfTbl.IdleRPM
         local AmbTemp   = SelfTbl.AmbientTemp
+        local IsPrimed  = SelfTbl.FuelPrimed
         local HeatCoeff = SelfTbl.HeatCoefficient or 0.012
         local AsmFric   = SelfTbl.Friction or 1
 
         -- Assembly friction adds heat to the oil circuit
         local Omega     = (RPM * 2 * PI) * 0.0166667
-        local P_fric_kW = (AsmFric * Omega) * 0.001
+        local PowerFriction = (AsmFric * Omega) * 0.001
 
-        local TotalHeat = (ACF.HeatGenerationAtIdle + HeatCoeff) * Torque * Throttle * DeltaTime * ACF.HeatGenerationScalar
+        local IdleHeat  = ACF.HeatGenerationAtIdle * ACF.HeatGenerationScalar * DeltaTime
+        local LoadHeat  = HeatCoeff * Power * Throttle * ACF.HeatGenerationScalar * DeltaTime
+
+        local TotalHeat = IsPrimed and SelfTbl.Active and IdleHeat + LoadHeat or 0
 
         -- Actual Thermal Calcs
         local CT = SelfTbl.Temperature.Coolant
         local OT = SelfTbl.Temperature.Oil
 
-        local HOCool = 0
+        -- Get the vehicle speed for the radiator ram-air effect
+        local Ancestor = Contraption.GetAncestor(self)
+        local AncestorPhys = IsEntityValid(Ancestor) and ENTITY.GetPhysicsObject(Ancestor)
+        local Velocity = (AncestorPhys and IsPhysObjValid(AncestorPhys)) and PHYSOBJ.GetVelocity(AncestorPhys):Length() or 0
 
+        local TotalHOCool = 0 -- Total Heat Out to Coolant
         SelfTbl.WaterPumpFlow = 0 -- We start at 0, cause we haven't calculated this yet or because there's no radiators
 
         local Rads = SelfTbl.Radiators
@@ -77,29 +77,29 @@ do -- State Handling
 
                     -- Water pump flow. Cavitates if coolant level is critically low
                     local Q = CoolantLevel >= CoolantLevelMin and K_PUMP_FLOW * RPM or 0
-                    SelfTbl.WaterPumpFlow = Q
+                    SelfTbl.WaterPumpFlow = SelfTbl.WaterPumpFlow + Q
 
-                    HOCool = Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime)
+                    TotalHOCool = TotalHOCool + Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime, Velocity)
                 else
-                    HOCool = Ent:CalcTemp(CT, 0, 0, DeltaTime)
+                    TotalHOCool = TotalHOCool + Ent:CalcTemp(CT, 0, 0, DeltaTime, Velocity)
                 end
             end
         end
 
-        -- Oil↔coolant heat exchange (bidirectional, scales with RPM)
-        local K_OC = K_OC_BASE * (RPM / IdleRPM) * ACF.HeatGenerationScalar
+        -- Oil<->coolant heat exchange (bidirectional, scales with RPM)
+        local K_OC = 0.001 * (RPM / IdleRPM) * ACF.HeatGenerationScalar
         local ExchangedHeat = K_OC * (OT - CT) * DeltaTime
 
         -- Total heat generated, distributed to coolant and oil.
         local HeatToCool = ACF.HeatFractionToCoolant * TotalHeat
-        local HeatToOil  = ACF.HeatFractionToOil * (TotalHeat + P_fric_kW * 0.001) * DeltaTime
+        local HeatToOil  = ACF.HeatFractionToOil * TotalHeat + (PowerFriction * 0.001) * DeltaTime
 
         -- Sump passive cooling + assembly friction heat added to oil
-        HOCool = HOCool + K_OIL_AMB * (CT - AmbTemp) * DeltaTime
+        local HOCool = K_OIL_AMB * (CT - AmbTemp) * DeltaTime -- Passive Heat out 
         local HOOil = K_OIL_AMB * (OT - AmbTemp) * DeltaTime
 
         -- Total calculation assignments 
-        SelfTbl.Temperature.Coolant = max(AmbTemp, CT + HeatToCool - HOCool + ExchangedHeat)
+        SelfTbl.Temperature.Coolant = max(AmbTemp, CT + HeatToCool - TotalHOCool - HOCool + ExchangedHeat)
         SelfTbl.Temperature.Oil     = max(AmbTemp, OT + HeatToOil - HOOil - ExchangedHeat)
 
         SelfTbl.WasTimed = false -- Reset our timer just in case 

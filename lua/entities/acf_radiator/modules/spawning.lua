@@ -1,63 +1,36 @@
 local ACF         = ACF
-local Classes     = ACF.Classes
 local WireLib     = WireLib
 local IsValid     = IsValid
 local Contraption = ACF.Contraption
 local ActiveRadiators = ACF.FuelTanks
 
-local RADIATORTYPE_BASE = "ACF.Radiators.RadiatorType"
-
 do -- Spawning
-    -- Resolves a FuelType client-data value (legacy short id, class FQN string, or {Type=} table)
-    -- to a ContainerShapes-style class FQN. Falls back to Standard radiator.
-    local function ResolveType(Value)
-        if istable(Value) and Value.Type then Value = Value.Type end
-        if Classes.GetTypeByName(Value) then return Value end -- Already a FQN
-
-        for _, Class in ipairs(Classes.GetSubtypes(RADIATORTYPE_BASE)) do
-            if Class.ID == Value then return Classes.GetTypeName(Class) end
-        end
-
-        return "ACF.Radiators.Standard"
-    end
-
-    function ENT:ACF_OnVerifyClientData(ClientData) end
-    function ENT:ACF_PreSpawn(_, _, _, ClientData)
-        self.ACF = {}
-
-        local ShapeClass = ResolveType(ClientData.RadiatorType)
-        ShapeClass = Classes.GetTypeByName(ShapeClass)
-        local Model = ShapeClass.Model
-
-        self.ACF.Model = Model
-        self:SetScaledModel(self.ACF.Model)
-    end
-
-    function ENT:ACF_OnSpawn()
-        self.Active          = false
-        self.ThermEnabled    = false
-        self.Engine          = nil
-        self.Mixture         = 0
-        self.MisteryText     = ""
-        self.IsLeaking       = false
-        self.LastActive      = false
-        self.LeakingRate     = 0
-        self.LastThink       = 0
-        self.LastTemperature = 0
-        self.LastAmount      = 0
-        self.LastActivated   = 0
+    function ENT:ACF_PreSpawn()
+        self.ACF              = {}
+        self.AmbTemp          = ACF.AmbientTemperature - 273.15 -- In Degrees Kelvin to Degrees Celcius.
+        self.Active           = false
+        self.FanActive        = false
+        self.CoreEff          = 1.0
+        self.CoreTemp         = self.AmbTemp
+        self.Engine           = nil
+        self.IsLeaking        = false
+        self.LastActive       = 0
+        self.LastFanActive    = 0
+        self.LastThermEnabled = 0
+        self.LastThink        = 0
+        self.LastTemperature  = 0
+        self.LastCoreTemp     = 0
+        self.LastActivated    = 0
+        self.LastAmount       = 0
+        self.LeakingRate      = 0
+        self.MisteryText      = ""
+        self.Mixture          = 0
+        self.Temperature      = self.AmbTemp
+        self.ThermEnabled     = true
 
         duplicator.ClearEntityModifier(self, "mass")
 
         ActiveRadiators[self] = true
-    end
-
-    function ENT:ACF_PostSpawn(_, _, _, ClientData)
-        self.AmbTemp     = ACF.AmbientTemperature - 273.15 -- In Degrees Kelvin to Degrees Celcius.
-        self.Temperature = self.AmbTemp
-
-        self:SetScale(self.ACF.Scale)
-        WireLib.TriggerOutput(self, "Temperature", self.Temperature)
     end
 end
 ACF.RegisterLinkSource("acf_radiator", "Engine")
@@ -68,17 +41,13 @@ do -- Updating
 
         local RadType = self:GetRadiator()
         local Scale   = self:ACF_GetUserVar("RadiatorScale")
-        local Size    = Vector(
-            self:ACF_GetUserVar("RadiatorSizeX"),
-            self:ACF_GetUserVar("RadiatorSizeY"),
-            self:ACF_GetUserVar("RadiatorSizeZ")
-        )
         local Mixture = self:ACF_GetUserVar("CoolantMix")
         local Density = self:ACF_GetUserVar("Density")
         local SpecificHeat = self:ACF_GetUserVar("SpecificHeat")
+        local ThermostatTemp = self:ACF_GetUserVar("ThermostatTemp")
         local Model   = (RadType and RadType.Model) or "models/radiators/Radiator_small.mdl"
 
-        -- Keep the current fuel level proportionally when reconfiguring an existing tank.
+        -- Keep the current fuel level proportionally when reconfiguring an existing radiator.
         local Percentage = (self.Capacity and self.Amount) and (self.Amount / self.Capacity) or 1
 
         self.ACF.Model = Model
@@ -89,33 +58,27 @@ do -- Updating
         self.SpecificHeat = SpecificHeat
         self.EntType = "Radiator"
         self.Name    = RadType.Name
-        self.IsBlock = RadType.IsBlock
 
-        if RadType.IsBlock then
-            self:SetSize(Size)
-            local _, Capacity, EmptyMass = self:CalcVolumeAndCapacity(Size)
+        self:SetScale(Scale)
+        self.ACF.Scale = Scale
+        self.BaseCapacity = RadType.BaseCapacity
+        self.EmptyMass = RadType.BaseEmptyMass
+        self.ThermOpenAtTemp = ThermostatTemp
 
-            self.Capacity = Capacity
-            self.EmptyMass = EmptyMass
-
-        else
-            self:SetScale(Scale)
-            self.ACF.Scale = Scale
-            self.BaseCapacity = RadType.BaseCapacity
-            self.BaseEmptyMass = RadType.BaseEmptyMass
-
-            local Capacity, Mass = self:CalcMassAndCapacity(Scale)
-            self.EmptyMass = Mass
-            self.Capacity = Capacity
-        end
+        local Capacity, Mass = self:CalcMassAndCapacity(Scale)
+        self.Mass = Mass
+        self.Capacity = Capacity
 
         self.UnitMass = RadType.Density
         self.Amount = Percentage * self.Capacity
 
+        WireLib.TriggerOutput(self, "Temperature", self.Temperature)
+        WireLib.TriggerOutput(self, "Core Temperature", self.CoreTemp)
         WireLib.TriggerOutput(self, "Amount", self.Amount)
         WireLib.TriggerOutput(self, "Capacity", self.Capacity)
+        WireLib.TriggerOutput(self, "Thermostat Active", self.ThermEnabled and 1 or 0)
 
-        Contraption.SetMass(self, self.EmptyMass)
+        Contraption.SetMass(self, self.Mass)
         self:UpdateMass(true)
     end
 end
@@ -125,11 +88,13 @@ do -- Wiremod input handlers
     ACF.AddInputAction("acf_radiator", "Active", function(Entity, Value)
         Entity.Active = tobool(Value)
 
-        WireLib.TriggerOutput(Entity, "Activated", Entity.Active and 1 or 0)
+        Entity:SetActive(Value)
     end)
-    -- Thermostat, does nothing at the moment
+    -- Thermostat, allows the fan to engage if active
     ACF.AddInputAction("acf_radiator", "Thermostat", function(Entity, Value)
         Entity.ThermEnabled = tobool(Value)
+
+        WireLib.TriggerOutput(Entity, "Thermostat Active", Entity.ThermEnabled and 1 or 0)
     end)
 end
 
@@ -150,7 +115,7 @@ end
 function ENT:CalcMassAndCapacity(Scale)
     local Density  = self.Density
     local Capacity = self.BaseCapacity * Scale ^ 2.15
-    local BaseMass = self.BaseEmptyMass + (Capacity * Density)
+    local BaseMass = self.EmptyMass + (Capacity * Density)
     return Capacity, BaseMass
 end
 

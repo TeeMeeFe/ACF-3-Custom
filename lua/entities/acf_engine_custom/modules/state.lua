@@ -50,11 +50,11 @@ local function GetPipelineVolume(PipeLength, PipeSize)
     return (PI / 4) * PipeSize * PipeSize * PipeLength / 1000 -- in mL
 end
 
--- Get the nearest fuel tank, to calculate pipeline pressure build/decay
-local function GetClosestFuelTank(Engine)
-    local Length = math.huge
+-- Calculates fuel tank distance based on the furthest one, to calculate pipeline pressure build/decay.
+local function CalcFuelTankDistance(Engine)
+    local Length = 0
     for _, Dist in pairs(Engine.FuelLinkDistances) do
-        if Dist < Length then
+        if Dist > Length then
             Length = Dist
         end
     end
@@ -143,7 +143,7 @@ local function SetActive(Entity, Value, EntTbl)
         Entity:NextThink(Clock.CurTime + TickInterval())
 
         -- Fuel rail pressure calc.
-        local FuelLength = GetClosestFuelTank(Entity)
+        local FuelLength = CalcFuelTankDistance(Entity)
         local PipelineVol = GetPipelineVolume(Clamp(FuelLength, 1, MaxDistance), EntTbl.PipeRefSize)
         local PressureBuildRate = min(EntTbl.PumpFlow / PipelineVol, 1)
         local PressureDecayRate = min(PipelineVol / EntTbl.PipeLeakRate, PressureBuildRate * 2)
@@ -178,8 +178,10 @@ local function SetActive(Entity, Value, EntTbl)
 
     -- Set the radiator to whatever state this entity is in
     for Ent, Link in pairs(EntTbl.Radiators) do
-        if not Ent.Disabled then
+        if not Ent.Disabled and IsEntityValid(Ent) then
             Ent:SetActive(EntTbl.Active)
+        elseif not IsEntityValid(Ent) then
+            EntTbl.Radiators[Ent] = nil -- I shouldn't be doing this but sometimes it gets left lingering like this.
         end
     end
 
@@ -328,7 +330,7 @@ do -- Actual engine rpm and torque calculations
 
             local Consumption = SelfTbl.GetConsumption(self, Throttle, FlyRPM, FuelTank, SelfTbl) * DeltaTime
 
-            SelfTbl.FuelUsage = 60 * Consumption / max(DeltaTime, 0.001) -- Clamp this bitch so it doesn't NaN out
+            SelfTbl.FuelUsage = SelfTbl.Active and 60 * Consumption / max(DeltaTime, 0.001) or 0 -- Clamp this bitch so it doesn't NaN out
             ENTITY.GetTable(FuelTank).Consume(FuelTank, Consumption)
         elseif ACF.RequireFuel then -- Stay active if fuel consumption is disabled
             SetActive(self, false, SelfTbl)
