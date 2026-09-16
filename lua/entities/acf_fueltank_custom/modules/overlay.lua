@@ -2,7 +2,9 @@ local Round = math.Round
 
 -- Overlay text
 function ENT:ACF_UpdateOverlayState(State)
-    if self:CanConsume() then
+    if self.ACF.Health == 0 then
+        State:AddError("Destroyed")
+    elseif self:CanConsume() then
         State:AddSuccess("Active")
     else
         State:AddWarning("Idle")
@@ -11,13 +13,12 @@ function ENT:ACF_UpdateOverlayState(State)
     if self.Leaking and self.Leaking > 0 then
         State:AddWarning("WARNING: Leaking!")
     end
-
     -- The V2 fuel type and size instances lives on the entity's field set; read them straight off.
     local SizeX = self:ACF_GetUserVar("FuelSizeX")
     local SizeY = self:ACF_GetUserVar("FuelSizeY")
     local SizeZ = self:ACF_GetUserVar("FuelSizeZ")
 
-    State:AddKeyValue("Size", ("%s x %s x %s"):format(SizeX, SizeY, SizeZ))
+    State:AddSize("Size", SizeY, SizeX, SizeZ)
 
     local FuelType = self:ACF_GetUserVar("FuelType")
 

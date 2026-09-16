@@ -143,5 +143,4 @@ function ENT:UpdateOutputs(SelfTbl)
         SelfTbl.LastTemperature = Temperature
         WireLib.TriggerOutput(self, "Temperature", Temperature)
     end
-
 end

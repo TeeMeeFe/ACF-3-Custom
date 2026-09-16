@@ -114,22 +114,20 @@ local function Build(Menu, Contexts)
     function FuelType:UpdateFuelText()
         if not self.Selected then return end
 
-        local Wall  = ACF.ContainerArmor * ACF.MmToInch
         local ShapeInst = Fuel:Get("Shape")
         local Shape = (ShapeInst and ShapeInst.GetType) and ShapeInst:GetType() or GetType("ACF.ContainerShapes.Box")
 
-        local Volume, Area = Shape.ShapeCalculation(TankSize, Wall)
+        local Volume = Shape.ShapeCalculation(TankSize)
 
-        local Capacity  = Volume * ACF.gCmToKgIn
-        local EmptyMass = Area * Wall * ACF.InchToCmCu * ACF.SteelDensity
-        local Mass      = EmptyMass + Capacity * self.Selected.Density
+        local Capacity = Volume * ACF.gCmToKgIn
+        local Mass     = Capacity * self.Selected.Density
 
         local FuelText
         if self.Selected.FuelTankText then
-            FuelText = self.Selected.FuelTankText(Capacity, Mass, EmptyMass)
+            FuelText = self.Selected.FuelTankText(Capacity, Mass)
         else
             local Text = language.GetPhrase("acf.menu.fuel.tank_stats")
-            FuelText = Text:format(ACF.ContainerArmor, math.Round(Capacity, 2), math.Round(Capacity * ACF.LToGal, 2), ACF.GetProperMass(Mass), ACF.GetProperMass(EmptyMass))
+            FuelText = Text:format(math.Round(Capacity, 2), math.Round(Capacity * ACF.LToGal, 2), ACF.FormatMass(Mass))
         end
 
         FuelDesc:SetText("Scalable Fuel Tank\n\nShape: " .. (Shape.Name or "Box"))

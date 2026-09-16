@@ -5,7 +5,7 @@ ENT.ACF_PreventArmoring = true
 
 ENT.IsACFEngineCustom = true
 
-ACF.Entities.AutoRegisterV2(function(CLASS)
+ACF.Entities.AutoRegister(20260916, function(CLASS)
     MENU_FIELD("ACF.CustomEngines.BaseEngineBlock", "BlockType", {
         OnlyAllowSubtypes = true,
         InstantiateTypeForDefault = "ACF.CustomEngines.InlineEngine"
@@ -46,6 +46,8 @@ ENT.ACF_StaticWireOutputs = {
     "State (Current state of the engine, whether its off, starting, running or stalling.) [STRING]",
     "Coolant Temp (Current Coolant Temperature of the engine, in degrees Celcius.)",
     "Oil Temp (Current Oil Temperature of the engine, in degrees Celcius.)",
+    "Oil Pressure (Current Oil pressure, in bar.)",
+    "Oil Warning (Whether the oil pressure is low enough for the engine to begin damaging itself.)",
     "Mass (Total mass detected on the vehicle by the engine.)",
     "Physical Mass (Physical mass detected on the vehicle by the engine.)",
     "Entity (The engine itself.) [ENTITY]",

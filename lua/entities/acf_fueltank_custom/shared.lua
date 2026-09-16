@@ -2,7 +2,7 @@ DEFINE_BASECLASS("acf_container")
 
 ENT.ACF_Limit = 32
 
-ACF.Entities.AutoRegisterV2(function()
+ACF.Entities.AutoRegister(20260916, function()
     MENU_FIELD("ACF.CustomFuelTypes.FuelType", "FuelType",  {
         OnlyAllowSubtypes = true,
         InstantiateTypeForDefault = "ACF.CustomFuelTypes.CustomPetrol"
