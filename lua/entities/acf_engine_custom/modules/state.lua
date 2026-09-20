@@ -145,8 +145,8 @@ local function SetActive(Entity, Value, EntTbl)
         -- Fuel rail pressure calc.
         local FuelLength = CalcFuelTankDistance(Entity)
         local PipelineVol = GetPipelineVolume(Clamp(FuelLength, 1, MaxDistance), EntTbl.PipeRefSize)
-        local PressureBuildRate = min(EntTbl.PumpFlow / PipelineVol, 1)
-        local PressureDecayRate = min(PipelineVol / EntTbl.PipeLeakRate, PressureBuildRate * 2)
+        local PressureBuildRate = EntTbl.PumpFlow / PipelineVol
+        local PressureDecayRate = PipelineVol * EntTbl.PipeLeakRate
 
         EntTbl.RailBuildRate = PressureBuildRate
         EntTbl.RailDecayRate = PressureDecayRate
@@ -351,7 +351,7 @@ do -- Actual engine rpm and torque calculations
         if FlyRPM < LimitRPM then
             local Sample = SelfTbl.Sample(FlyRPM)
             Torque = SelfTbl.FuelPrimed and Throttle * Sample[1] * TorqueMult * DamageMult or 0
-            Friction = Sample[2]
+            Friction = Sample[2] * (SelfTbl.OilViscosity or 1.0)
         end
 
         -- The gearboxes don't think on their own, it's the engine that calls them, to ensure consistent execution order
@@ -504,6 +504,14 @@ function ENT:UpdateOutputs(SelfTbl)
     if SelfTbl.LastOilTemp ~= Temps.Oil then
         SelfTbl.LastOilTemp = Temps.Oil
         WireLib.TriggerOutput(self, "Oil Temp", Temps.Oil)
+    end
+    if SelfTbl.LastOilPressure ~= Round(SelfTbl.OilPressureBar, 1) then
+        SelfTbl.LastOilPressure = Round(SelfTbl.OilPressureBar, 1)
+        WireLib.TriggerOutput(self, "Oil Pressure", SelfTbl.LastOilPressure)
+    end
+    if SelfTbl.LastOilWarning ~= (not SelfTbl.OilPressureOK) then
+        SelfTbl.LastOilWarning = not SelfTbl.OilPressureOK
+        WireLib.TriggerOutput(self, "Oil Warning", SelfTbl.LastOilWarning and 1 or 0)
     end
 end
 

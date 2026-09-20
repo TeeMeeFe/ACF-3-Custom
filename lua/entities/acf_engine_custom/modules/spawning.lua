@@ -85,6 +85,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.PipeLeakRate         = LeakRate
 	Entity.Mass                 = Compute.ScaledMass
 	Entity.LimitRPM   		    = Compute.LimitRPM
+	Entity.OilKPump 		    = 1.0 / max(Entity.IdleRPM, 1)
 	Entity.OilSumpTilt  		= Compute.OilSumpTilt
 	Entity.PeakTorque			= Compute.PeakTorque
 	Entity.PeakPower			= Compute.PeakPower
@@ -162,6 +163,8 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.LastTotalMass 		= 0
 	self.LastPhysMass  		= 0
 	self.LastState 			= ""
+	self.LastOilPressure    = 0
+	self.LastOilWarning     = 0
 	self.LastPitch     		= 0
 	self.SoundPath     		= "vehicles/junker/jnk_fourth_cruise_loop2.wav" -- Placeholder for now
 	self.FuelUsage     		= 0
@@ -171,6 +174,11 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.IdleThrottle	    = 0
 	self.LastIdleThrottle   = 0
 	self.IsStalled		    = false
+	self.PrevVelocity  		= Vector(0, 0, 0)
+	self.OilViscosity       = 0
+	self.OilPressureBar     = 0
+	self.OilStarvation 		= 0
+	self.OilPressureOK 		= true
 	self.State         		= "Idle"
 	self.SoundBanks    		= {}
 	self.RailPressure       = 0

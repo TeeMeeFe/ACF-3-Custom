@@ -33,7 +33,7 @@ ACF.Classes.DefineClass("ACF.CustomEngines.StarterMotor", "ACF.CustomEngines.Ele
         -- Assembly friction calibration
         -- T_fric = K_FRIC × μ_norm × RPM ^ ACF.FrictionalRPMExponent × Displacement
         -- Calibrated: 7.4 Nm at idle (850 RPM), 90 °C, 1.8 L
-        local K_FRIC  = 7.4 / (IdleRPM ^ ACF.FrictionalRPMExponent * Displacement)
+        local K_FRIC = 7.4 / (IdleRPM ^ ACF.FrictionalRPMExponent * Displacement)
 
         local CrankRPM = (IgnitionType == "glow") and CRANK_RPM_DIESEL or CRANK_RPM_PETROL
         -- Torque the electric motor generates when at stall (0 RPM)

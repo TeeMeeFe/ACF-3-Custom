@@ -9,22 +9,46 @@ local IsEntityValid	 = ACF.Optimizations.IsEntityValid
 local IsPhysObjValid = ACF.Optimizations.IsPhysObjValid
 
 --===============================================================================================--
--- Constants 
+-- Constants (Slop swamp warning [Sorryyyy >.<])
 --===============================================================================================--
 
 -- Water pump: Q (L/s) = K_PUMP_FLOW × RPM
 -- 0.667 L/s at 3 000 RPM (≈ 40 L/min automotive spec)
-local K_PUMP_FLOW       = 0.667 / 3000
-
+local K_PUMP_FLOW  = 0.667 / 3000
 -- Oil passive cooling
 -- K_OIL_AMB × (90 - 20) = HEAT_IDLE_GAIN × HEAT_FRAC_OIL = 0.045
-local K_OIL_AMB         = 0.045 / 70  -- 6.43e-4
+local K_OIL_AMB  = 0.045 / 70  -- 6.43e-4
+-- Oil system constants 
+local OIL_OPTIMAL_T   = 90     -- °C  reference viscosity temperature
+-- Relative viscosity vs 90°C optimum: 20°C -> 6.25x, 160°C -> 0.17x
+local LN_VISC_COLD_HOT = math.log(6.25) / (OIL_OPTIMAL_T - 20)
+
+local OIL_P_MIN_RUN   = 1.0    -- bar, minimum for hydrodynamic film
+local OIL_P_RELIEF    = 5.0    -- bar, relief valve cap
+
+local OIL_PRESSURE_TAU      = 0.3  -- s, response lag — TUNE
+local OIL_STARV_TAU_STARVE  = 5.0  -- s, time to fully starve at OilEffectivePressure=0
+local OIL_STARV_TAU_RECOVER = 2.0  -- s, recovery time once pressure restored
+local OIL_STARV_WARN        = 0.10 -- accumulator fraction that triggers warning
+
+-- Extreme, sustained oil starvation degrades TorqueDamageMult — a
+-- SOFT consequence via the existing damage-multiplier hook, not a new
+-- hard failure state. Floored well above zero deliberately; this isn't
+-- meant to be a standalone "engine deleted" mechanism.
+-- local OIL_SEIZE_WEAR_RATE = 0.02  -- TorqueDamageMult lost per second at full starvation
+-- local OIL_DAMAGE_FLOOR    = 0.05
+
+local G_DEG_PER_G = 5.7  -- ° equivalent tilt per G of lateral/longitudinal force
 
 --===============================================================================================--
 -- Local Funcs and Vars
 --===============================================================================================--
-local PI = math.pi
-local max = math.max
+local PI   = math.pi
+local abs  = math.abs
+local max  = math.max
+local min  = math.min
+local sqrt = math.sqrt
+local exp  = math.exp
 
 do -- State Handling
     function ENT:CalcTemp(SelfTbl)
@@ -55,11 +79,69 @@ do -- State Handling
         local CT = SelfTbl.Temperature.Coolant
         local OT = SelfTbl.Temperature.Oil
 
-        -- Get the vehicle speed for the radiator ram-air effect
-        local Ancestor = Contraption.GetAncestor(self)
-        local AncestorPhys = IsEntityValid(Ancestor) and ENTITY.GetPhysicsObject(Ancestor)
-        local Velocity = (AncestorPhys and IsPhysObjValid(AncestorPhys)) and PHYSOBJ.GetVelocity(AncestorPhys):Length() or 0
+        -- Get the vehicle speed for the radiator ram-air effect as well as for the engine g-forces
+        -- Have to do this here so we don't do it again twice for the g-force calcs. 
+        local Ancestor     = Contraption.GetAncestor(self)
+        local AncestorEnt  = IsEntityValid(Ancestor) and Ancestor
+        local AncestorPhys = AncestorEnt and ENTITY.GetPhysicsObject(AncestorEnt)
+        local PhysValid    = AncestorPhys and IsPhysObjValid(AncestorPhys)
 
+        local VehicleSpeed = PhysValid and PHYSOBJ.GetVelocity(AncestorPhys):Length() or 0
+
+        -- Oil calcs
+        -- G-force (finite difference of chassis velocity) 
+        local G_lat, G_lon = 0, 0
+        if PhysValid and DeltaTime ~= 0 then
+            local VelNow  = PHYSOBJ.GetVelocity(AncestorPhys) * ACF.InchToMeter
+            local PrevVel = SelfTbl.PrevVelocity or VelNow
+            local Accel   = (VelNow - PrevVel) / DeltaTime
+            SelfTbl.PrevVelocity = VelNow
+
+            local Ang = ENTITY.GetAngles(AncestorEnt)
+            G_lat = Accel:Dot(Ang:Right())   / 9.81
+            G_lon = Accel:Dot(Ang:Forward()) / 9.81
+        end
+
+        -- Oil pressure / sump tilt / starvation 
+        local TiltWarn   = SelfTbl.OilSumpTilt.Warn
+        local TiltStarve = SelfTbl.OilSumpTilt.Starve
+
+        local Pitch = AncestorEnt and abs(ENTITY.GetAngles(AncestorEnt).p) or 0
+        local Roll  = AncestorEnt and abs(ENTITY.GetAngles(AncestorEnt).r) or 0
+        local EffPitch = Pitch + abs(G_lon) * G_DEG_PER_G
+        local EffRoll  = Roll  + abs(G_lat) * G_DEG_PER_G
+        local Theta = min(sqrt(EffPitch * EffPitch + EffRoll * EffRoll), 180)
+
+        local FTilt
+
+        if Theta <= TiltWarn then FTilt = 1.0
+        elseif Theta >= TiltStarve then FTilt = 0.0
+        else FTilt = 1.0 - (Theta - TiltWarn) / (TiltStarve - TiltWarn) end
+
+        -- OilKPump precomputed once at configure time
+        local OilTargetPressure = min((SelfTbl.OilKPump or 0) * RPM, OIL_P_RELIEF) * FTilt
+        local OilEffectivePressure    = SelfTbl.OilPressureBar or OilTargetPressure
+        OilEffectivePressure = OilEffectivePressure + (OilTargetPressure - OilEffectivePressure) * min(DeltaTime / OIL_PRESSURE_TAU, 1)
+        SelfTbl.OilPressureBar = OilEffectivePressure
+
+        local OilStarvation = SelfTbl.OilStarvation or 0
+        if OilEffectivePressure < OIL_P_MIN_RUN then
+            OilStarvation = min(1, OilStarvation + (1 - OilEffectivePressure / OIL_P_MIN_RUN) * DeltaTime / OIL_STARV_TAU_STARVE)
+        else
+            OilStarvation = max(0, OilStarvation - DeltaTime / OIL_STARV_TAU_RECOVER)
+        end
+        SelfTbl.OilStarvation = OilStarvation
+        SelfTbl.OilPressureOK = OilStarvation < OIL_STARV_WARN
+
+        -- Soft wear consequence, only at FULL starvation, floored, not a hard kill
+        -- if OilStarvation >= 1.0 then
+        --     SelfTbl.TorqueDamageMult = max(OIL_DAMAGE_FLOOR, (SelfTbl.TorqueDamageMult or 1) - OIL_SEIZE_WEAR_RATE * DeltaTime)
+        -- end
+
+        -- Live viscosity from ACTUAL current oil temperature
+        SelfTbl.OilViscosity = exp(-LN_VISC_COLD_HOT * (OT - OIL_OPTIMAL_T))
+
+        -- Coolant/Oil temperature calcs
         local TotalHOCool = 0 -- Total Heat Out to Coolant
         SelfTbl.WaterPumpFlow = 0 -- We start at 0, cause we haven't calculated this yet or because there's no radiators
 
@@ -79,9 +161,9 @@ do -- State Handling
                     local Q = CoolantLevel >= CoolantLevelMin and K_PUMP_FLOW * RPM or 0
                     SelfTbl.WaterPumpFlow = SelfTbl.WaterPumpFlow + Q
 
-                    TotalHOCool = TotalHOCool + Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime, Velocity)
+                    TotalHOCool = TotalHOCool + Ent:CalcTemp(CT, TotalHeat, Q, DeltaTime, VehicleSpeed)
                 else
-                    TotalHOCool = TotalHOCool + Ent:CalcTemp(CT, 0, 0, DeltaTime, Velocity)
+                    TotalHOCool = TotalHOCool + Ent:CalcTemp(CT, 0, 0, DeltaTime, VehicleSpeed)
                 end
             end
         end
