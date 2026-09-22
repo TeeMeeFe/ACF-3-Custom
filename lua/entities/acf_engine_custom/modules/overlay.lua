@@ -23,7 +23,11 @@ function ENT:ACF_UpdateOverlayState(State)
         State:AddError("This engine has no starter but requires one!")
     end
 
-    if self.State == "Active" then
+    if self.ACF.Health == 0 then
+        State:AddError("Destroyed")
+    elseif self.Disabled then
+        State:AddError("Disabled!")
+    elseif self.ACF.Health ~= 0 and self.State == "Active" then
         State:AddSuccess(self.State)
     else
         State:AddWarning(self.State)

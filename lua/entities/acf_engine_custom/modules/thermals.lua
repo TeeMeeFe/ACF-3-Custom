@@ -23,20 +23,10 @@ local OIL_OPTIMAL_T   = 90     -- °C  reference viscosity temperature
 -- Relative viscosity vs 90°C optimum: 20°C -> 6.25x, 160°C -> 0.17x
 local LN_VISC_COLD_HOT = math.log(6.25) / (OIL_OPTIMAL_T - 20)
 
-local OIL_P_MIN_RUN   = 1.0    -- bar, minimum for hydrodynamic film
-local OIL_P_RELIEF    = 5.0    -- bar, relief valve cap
-
 local OIL_PRESSURE_TAU      = 0.3  -- s, response lag — TUNE
-local OIL_STARV_TAU_STARVE  = 5.0  -- s, time to fully starve at OilEffectivePressure=0
+local OIL_STARV_TAU_STARVE  = 5.0  -- s, time to fully starve at OilEffPress=0
 local OIL_STARV_TAU_RECOVER = 2.0  -- s, recovery time once pressure restored
 local OIL_STARV_WARN        = 0.10 -- accumulator fraction that triggers warning
-
--- Extreme, sustained oil starvation degrades TorqueDamageMult — a
--- SOFT consequence via the existing damage-multiplier hook, not a new
--- hard failure state. Floored well above zero deliberately; this isn't
--- meant to be a standalone "engine deleted" mechanism.
--- local OIL_SEIZE_WEAR_RATE = 0.02  -- TorqueDamageMult lost per second at full starvation
--- local OIL_DAMAGE_FLOOR    = 0.05
 
 local G_DEG_PER_G = 5.7  -- ° equivalent tilt per G of lateral/longitudinal force
 
@@ -119,14 +109,15 @@ do -- State Handling
         else FTilt = 1.0 - (Theta - TiltWarn) / (TiltStarve - TiltWarn) end
 
         -- OilKPump precomputed once at configure time
-        local OilTargetPressure = min((SelfTbl.OilKPump or 0) * RPM, OIL_P_RELIEF) * FTilt
-        local OilEffectivePressure    = SelfTbl.OilPressureBar or OilTargetPressure
-        OilEffectivePressure = OilEffectivePressure + (OilTargetPressure - OilEffectivePressure) * min(DeltaTime / OIL_PRESSURE_TAU, 1)
-        SelfTbl.OilPressureBar = OilEffectivePressure
+        local OilTgtPress = min((SelfTbl.OilKPump or 0) * RPM, SelfTbl.OilPRelief) * FTilt
+        local OilEffPress  = SelfTbl.OilPressureBar or OilTgtPress
+        OilEffPress = OilEffPress + (OilTgtPress - OilEffPress) * min(DeltaTime / OIL_PRESSURE_TAU, 1)
+        SelfTbl.OilPressureBar = OilEffPress
 
         local OilStarvation = SelfTbl.OilStarvation or 0
-        if OilEffectivePressure < OIL_P_MIN_RUN then
-            OilStarvation = min(1, OilStarvation + (1 - OilEffectivePressure / OIL_P_MIN_RUN) * DeltaTime / OIL_STARV_TAU_STARVE)
+        local OilPMinRun = SelfTbl.OilPMinRun
+        if OilEffPress < OilPMinRun then
+            OilStarvation = min(1, OilStarvation + (1 - OilEffPress / OilPMinRun) * DeltaTime / OIL_STARV_TAU_STARVE)
         else
             OilStarvation = max(0, OilStarvation - DeltaTime / OIL_STARV_TAU_RECOVER)
         end
@@ -174,11 +165,11 @@ do -- State Handling
 
         -- Total heat generated, distributed to coolant and oil.
         local HeatToCool = ACF.HeatFractionToCoolant * TotalHeat
-        local HeatToOil  = ACF.HeatFractionToOil * TotalHeat + (PowerFriction * 0.001) * DeltaTime
+        local HeatToOil  = (1 - ACF.HeatFractionToCoolant) * TotalHeat + (PowerFriction * 0.001) * DeltaTime
 
         -- Sump passive cooling + assembly friction heat added to oil
-        local HOCool = K_OIL_AMB * (CT - AmbTemp) * DeltaTime -- Passive Heat out 
-        local HOOil = K_OIL_AMB * (OT - AmbTemp) * DeltaTime
+        local HOCool = K_OIL_AMB * (CT - AmbTemp) * DeltaTime * ACF.HeatGenerationScalar -- Passive Heat out 
+        local HOOil = K_OIL_AMB * (OT - AmbTemp) * DeltaTime * ACF.HeatGenerationScalar
 
         -- Total calculation assignments 
         SelfTbl.Temperature.Coolant = max(AmbTemp, CT + HeatToCool - TotalHOCool - HOCool + ExchangedHeat)

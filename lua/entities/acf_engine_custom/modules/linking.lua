@@ -107,12 +107,15 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_radiator", function(Engine, Targ
     if Engine:GetPos():DistToSqr(Target:GetPos()) > MaxRadDistance then return false, "The radiator is too far away from this engine!" end
     -- Radiators can only link to 1 engine but engines can link to N radiators(1:N cardinality)
     if IsEntityValid(Target.Engine) and Target.Engine ~= Engine then return false, "The radiator is already linked to another engine!" end
+    if Engine.Active then return false, "Please turn off the engine before linking this radiator!" end
+    -- Radiators can't link to a hot engine to cool it down 
+    local Temperature = Engine.Temperature
+    local HighestTemp = math.max(Temperature.Coolant, Temperature.Oil)
 
-    -- TODO: Set any other custom linking restrictions here
+    if HighestTemp > ACF.UnpressurizedTemperature or (Target.CoreTemperature - HighestTemp) > 20 then return false, "Too hot! Please wait for the engine to cool down!" end
 
     Engine.Radiators[Target] = true
     Target.Engine = Engine
-    Target.Active = Engine.Active -- Hot-Activate the radiator
 
     Engine:UpdateOverlay()
     Target:UpdateOverlay()

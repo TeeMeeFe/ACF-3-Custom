@@ -5,6 +5,7 @@ Classes.DefineClass("ACF.Radiators.Intercooler", "ACF.Radiators.BaseRadiator", f
     CLASS.Name = "Standard Intercooler"
     CLASS.Description = "A radiator meant to cool down engine intake gas temperature."
     CLASS.Model = "models/radiators/Radiator_small.mdl"
+    CLASS.HealthMult = 0.75 -- Sturdier than the standard radiator, since its just cooling out intake gas, not fluids.
 
     MENU_FIELD("Number", "Scale", {Min = 0.5, Max = 1, Default = 1, Decimals = 2})
 

@@ -9,6 +9,7 @@ Classes.DefineClass("ACF.Radiators.Standard", "ACF.Radiators.BaseRadiator", func
     CLASS.Name = "Standard Radiator"
     CLASS.Description = "A radiator for cooling down any Naturally Aspirated engines."
     CLASS.Model = "models/radiators/Radiator_med.mdl"
+    CLASS.HealthMult = 0.05   -- Very Fragile, anything can just trigger a failure and begin loosing its contents 
     CLASS.BaseEmptyMass = 20  -- Mass when empty, In kilograms.
     CLASS.BaseCapacity  = 6.5 -- This radiator base capacity at scale 1, In liters.
 

@@ -6,6 +6,8 @@ function ENT:ACF_UpdateOverlayState(State)
         State:AddError("Destroyed")
     elseif self:CanConsume() then
         State:AddSuccess("Active")
+    elseif self.Amount == 0 then
+        State:AddWarning("Idle and Empty")
     else
         State:AddWarning("Idle")
     end

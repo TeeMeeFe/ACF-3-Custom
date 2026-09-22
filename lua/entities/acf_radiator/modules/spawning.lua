@@ -11,9 +11,12 @@ do -- Spawning
         self.Active           = false
         self.FanActive        = false
         self.CoreEff          = 1.0
-        self.CoreTemp         = self.AmbTemp
+        self.CoreTemperature  = self.AmbTemp
+        self.InputTemperature = self.AmbTemp
         self.Engine           = nil
+        self.IsDestroyed      = false
         self.IsLeaking        = false
+        self.IsFrozen         = false
         self.LastActive       = 0
         self.LastFanActive    = 0
         self.LastThermEnabled = 0
@@ -22,11 +25,14 @@ do -- Spawning
         self.LastCoreTemp     = 0
         self.LastActivated    = 0
         self.LastAmount       = 0
+        self.LastPressure     = 0
         self.LeakingRate      = 0
         self.MisteryText      = ""
         self.Mixture          = 0
-        self.Temperature      = self.AmbTemp
         self.ThermEnabled     = true
+        self.MaxPressure      = 1.2 -- bar, relief valve setting 
+        self.UnpressTemp      = ACF.RadUnpressTemperature -- °C, below this value the system runs unpressurized
+        self.Pressure         = 0
 
         duplicator.ClearEntityModifier(self, "mass")
 
@@ -61,6 +67,7 @@ do -- Updating
 
         self:SetScale(Scale)
         self.ACF.Scale = Scale
+        self.HealthMult = RadType.HealthMult
         self.BaseCapacity = RadType.BaseCapacity
         self.EmptyMass = RadType.BaseEmptyMass
         self.ThermOpenAtTemp = ThermostatTemp
@@ -72,8 +79,13 @@ do -- Updating
         self.UnitMass = RadType.Density
         self.Amount = Percentage * self.Capacity
 
-        WireLib.TriggerOutput(self, "Temperature", self.Temperature)
-        WireLib.TriggerOutput(self, "Core Temperature", self.CoreTemp)
+        local FreezePoint = self:ACF_GetUserVar("FreezingPoint")
+        local BoilingPoint = self:ACF_GetUserVar("BoilingPoint")
+        self.BoilingPoint = BoilingPoint
+        self.FreezePoint  = FreezePoint
+        self.IsFrozen     = self.CoreTemperature <= FreezePoint
+
+        WireLib.TriggerOutput(self, "Temperature", self.CoreTemperature)
         WireLib.TriggerOutput(self, "Amount", self.Amount)
         WireLib.TriggerOutput(self, "Capacity", self.Capacity)
         WireLib.TriggerOutput(self, "Thermostat Active", self.ThermEnabled and 1 or 0)

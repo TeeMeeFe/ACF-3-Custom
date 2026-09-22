@@ -255,6 +255,9 @@ do -- Actual engine rpm and torque calculations
             SetStarterActive(SelfTbl, SelfTbl.Active)
         end
 
+        -- Got destroyed, only keep updating thermals 
+        if SelfTbl.IsDestroyed then return end
+
         self:CalcRPM(SelfTbl)
         self:CalcTemp(SelfTbl)
 
