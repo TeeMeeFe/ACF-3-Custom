@@ -11,24 +11,38 @@ local IsPhysObjValid = ACF.Optimizations.IsPhysObjValid
 --===============================================================================================--
 -- Constants (Slop swamp warning [Sorryyyy >.<])
 --===============================================================================================--
+local COOL_WARN     = 105 -- Past this, the engine will begin getting little damage over time.
+local COOL_MAX      = 120 -- Same as above, but lots of damage over time.
+-- Oil system constants 
+local OIL_OPTIMAL_T = 90  -- °C  reference viscosity temperature
+local OIL_WARN      = 130 -- At this point the oil too hot, and the engine begins to lose power.
+local OIL_MAX       = 160 -- At this point the oil is too liquid and does not lubricate properly. Increased engine damage.
 
--- Water pump: Q (L/s) = K_PUMP_FLOW × RPM
--- 0.667 L/s at 3 000 RPM (≈ 40 L/min automotive spec)
-local K_PUMP_FLOW  = 0.667 / 3000
 -- Oil passive cooling
 -- K_OIL_AMB × (90 - 20) = HEAT_IDLE_GAIN × HEAT_FRAC_OIL = 0.045
-local K_OIL_AMB  = 0.045 / 70  -- 6.43e-4
--- Oil system constants 
-local OIL_OPTIMAL_T   = 90     -- °C  reference viscosity temperature
+local K_OIL_AMB     = 0.045 / 70  -- 6.43e-4
 -- Relative viscosity vs 90°C optimum: 20°C -> 6.25x, 160°C -> 0.17x
 local LN_VISC_COLD_HOT = math.log(6.25) / (OIL_OPTIMAL_T - 20)
 
-local OIL_PRESSURE_TAU      = 0.3  -- s, response lag — TUNE
+local OIL_PRESSURE_TAU      = 1.3  -- s, response lag
 local OIL_STARV_TAU_STARVE  = 5.0  -- s, time to fully starve at OilEffPress=0
 local OIL_STARV_TAU_RECOVER = 2.0  -- s, recovery time once pressure restored
 local OIL_STARV_WARN        = 0.10 -- accumulator fraction that triggers warning
 
-local G_DEG_PER_G = 5.7  -- ° equivalent tilt per G of lateral/longitudinal force
+-- Two-tier drain rate per fluid, same shape as the radiator's
+-- relief-vs-boil distinction: WARN = slow structural stress (head
+-- gasket / thinning oil film), MAX = fast (active warping/seizure risk).
+local COOL_WARN_DRAIN = 0.005   -- HP/s per °C over COOL_WARN 
+local COOL_MAX_DRAIN  = 0.015   -- HP/s per °C over COOL_MAX 
+local OIL_WARN_DRAIN  = 0.003   -- HP/s per °C over OIL_WARN
+local OIL_MAX_DRAIN   = 0.025   -- HP/s per °C over OIL_MAX 
+-- Oil damage constants 
+local OIL_SEIZE_WEAR_RATE = 0.2 -- TorqueDamageMult lost per second at full starvation
+local OIL_DAMAGE_FLOOR    = 0.5
+
+-- Water pump: Q (L/s) = K_PUMP_FLOW × RPM
+-- 0.667 L/s at 3 000 RPM (≈ 40 L/min automotive spec)
+local K_PUMP_FLOW     = 0.667 / 3000
 
 --===============================================================================================--
 -- Local Funcs and Vars
@@ -41,6 +55,45 @@ local sqrt = math.sqrt
 local exp  = math.exp
 
 do -- State Handling
+    local function CalcWear(Ent, SelfTbl, DeltaTime)
+        SelfTbl = SelfTbl or ENTITY.GetTable(Ent)
+
+        local FinalCT = SelfTbl.Temperature.Coolant
+        local FinalOT = SelfTbl.Temperature.Oil
+
+        local ThermalDrain = 0
+
+        if FinalCT > COOL_MAX then
+            ThermalDrain = ThermalDrain + (FinalCT - COOL_MAX) * COOL_MAX_DRAIN
+        elseif FinalCT > COOL_WARN then
+            ThermalDrain = ThermalDrain + (FinalCT - COOL_WARN) * COOL_WARN_DRAIN
+        end
+
+        if FinalOT > OIL_MAX then
+            ThermalDrain = ThermalDrain + (FinalOT - OIL_MAX) * OIL_MAX_DRAIN
+        elseif FinalOT > OIL_WARN then
+            ThermalDrain = ThermalDrain + (FinalOT - OIL_WARN) * OIL_WARN_DRAIN
+        end
+
+        -- Soft wear consequence, only at FULL starvation. Adds on top of ThermalDrain variable 
+        if SelfTbl.OilStarvation >= 1.0 and SelfTbl.Active then
+            ThermalDrain = ThermalDrain + max(OIL_DAMAGE_FLOOR, abs(ThermalDrain - OIL_SEIZE_WEAR_RATE) * DeltaTime)
+        end
+
+        if ThermalDrain > 0 then
+            SelfTbl.ACF.Health = max(0, SelfTbl.ACF.Health - ThermalDrain * DeltaTime)
+
+            -- Update torque based on our damage 
+            Ent:UpdateTorqueDamageMult()
+
+            if SelfTbl.ACF.Health == 0 and not SelfTbl.IsDestroyed then
+                SelfTbl.IsDestroyed = true
+                Ent:Disable()
+            end
+        end
+        return true
+    end
+
     function ENT:CalcTemp(SelfTbl)
         SelfTbl = SelfTbl or ENTITY.GetTable(self)
         if SelfTbl.Disabled then return end
@@ -98,8 +151,8 @@ do -- State Handling
 
         local Pitch = AncestorEnt and abs(ENTITY.GetAngles(AncestorEnt).p) or 0
         local Roll  = AncestorEnt and abs(ENTITY.GetAngles(AncestorEnt).r) or 0
-        local EffPitch = Pitch + abs(G_lon) * G_DEG_PER_G
-        local EffRoll  = Roll  + abs(G_lat) * G_DEG_PER_G
+        local EffPitch = Pitch + abs(G_lon) * ACF.GeeDegreesPerGees
+        local EffRoll  = Roll  + abs(G_lat) * ACF.GeeDegreesPerGees
         local Theta = min(sqrt(EffPitch * EffPitch + EffRoll * EffRoll), 180)
 
         local FTilt
@@ -110,24 +163,19 @@ do -- State Handling
 
         -- OilKPump precomputed once at configure time
         local OilTgtPress = min((SelfTbl.OilKPump or 0) * RPM, SelfTbl.OilPRelief) * FTilt
-        local OilEffPress  = SelfTbl.OilPressureBar or OilTgtPress
+        local OilEffPress  = SelfTbl.OilPressure or OilTgtPress
         OilEffPress = OilEffPress + (OilTgtPress - OilEffPress) * min(DeltaTime / OIL_PRESSURE_TAU, 1)
-        SelfTbl.OilPressureBar = OilEffPress
+        SelfTbl.OilPressure = OilEffPress
 
-        local OilStarvation = SelfTbl.OilStarvation or 0
-        local OilPMinRun = SelfTbl.OilPMinRun
-        if OilEffPress < OilPMinRun then
-            OilStarvation = min(1, OilStarvation + (1 - OilEffPress / OilPMinRun) * DeltaTime / OIL_STARV_TAU_STARVE)
+        local OilStarvation  = SelfTbl.Active and SelfTbl.OilStarvation or 0
+        local OilPressMinRun = SelfTbl.OilPressMinRun
+        if OilEffPress < OilPressMinRun then
+            OilStarvation = min(1, OilStarvation + (1 - OilEffPress / OilPressMinRun) * DeltaTime / OIL_STARV_TAU_STARVE)
         else
             OilStarvation = max(0, OilStarvation - DeltaTime / OIL_STARV_TAU_RECOVER)
         end
         SelfTbl.OilStarvation = OilStarvation
-        SelfTbl.OilPressureOK = OilStarvation < OIL_STARV_WARN
-
-        -- Soft wear consequence, only at FULL starvation, floored, not a hard kill
-        -- if OilStarvation >= 1.0 then
-        --     SelfTbl.TorqueDamageMult = max(OIL_DAMAGE_FLOOR, (SelfTbl.TorqueDamageMult or 1) - OIL_SEIZE_WEAR_RATE * DeltaTime)
-        -- end
+        SelfTbl.OilPressureOK = SelfTbl.Active and OilStarvation < OIL_STARV_WARN or true
 
         -- Live viscosity from ACTUAL current oil temperature
         SelfTbl.OilViscosity = exp(-LN_VISC_COLD_HOT * (OT - OIL_OPTIMAL_T))
@@ -176,6 +224,7 @@ do -- State Handling
         SelfTbl.Temperature.Oil     = max(AmbTemp, OT + HeatToOil - HOOil - ExchangedHeat)
 
         SelfTbl.WasTimed = false -- Reset our timer just in case 
-        return true
+
+        CalcWear(self, SelfTbl, DeltaTime)
     end
 end

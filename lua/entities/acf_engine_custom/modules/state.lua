@@ -101,7 +101,7 @@ local function CheckDistantRadiators(Engine)
    local EnginePos = Engine:GetPos()
 
     for Rad in pairs(Engine.Radiators) do
-        if EnginePos:DistToSqr(Rad:GetPos()) > MaxRadDistance then
+        if IsEntityValid(Rad) and EnginePos:DistToSqr(Rad:GetPos()) > MaxRadDistance then
             local Sound = UnlinkRadSound:format(random(1, 2))
 
             Sounds.SendSound(Engine, Sound, 85, 100, 1)
@@ -314,7 +314,7 @@ do -- Actual engine rpm and torque calculations
 
         -- Throttle Idler code shamefully stolen from Tyunge's engine rework.
         local IdleRatio = (IdleRPM - FlyRPM) / IdleRPM
-        SelfTbl.IdleThrottle = Clamp(SelfTbl.IdleThrottle + (IdleRatio * 0.25), 0, 1)
+        SelfTbl.IdleThrottle = Clamp(SelfTbl.IdleThrottle + (IdleRatio * 0.25), 0, 1) -- SelfTbl.TorqueDamageMult
 
         local SmoothedIdle = SelfTbl.IdleThrottle - SelfTbl.LastIdleThrottle
         SelfTbl.LastIdleThrottle = SelfTbl.IdleThrottle
@@ -470,12 +470,14 @@ end
 function ENT:UpdateOutputs(SelfTbl)
     SelfTbl = SelfTbl or ENTITY.GetTable(self)
 
-    local FuelUsage = Round(SelfTbl.FuelUsage)
-    local Torque    = SelfTbl.Torque
-    local FlyRPM    = SelfTbl.FlyRPM
-    local Power     = Round(Torque * FlyRPM / 9548.8)
-    local State     = SelfTbl.State
-    local Temps     = SelfTbl.Temperature
+    local FuelUsage   = Round(SelfTbl.FuelUsage)
+    local Torque      = SelfTbl.Torque
+    local FlyRPM      = SelfTbl.FlyRPM
+    local Power       = Round(Torque * FlyRPM / 9548.8)
+    local State       = SelfTbl.State
+    local Temps       = SelfTbl.Temperature
+    local OilPressure = SelfTbl.OilPressure
+    local OilWarning  = SelfTbl.OilPressureOK
 
     Torque = Round(Torque)
     FlyRPM = Round(FlyRPM)
@@ -508,13 +510,13 @@ function ENT:UpdateOutputs(SelfTbl)
         SelfTbl.LastOilTemp = Temps.Oil
         WireLib.TriggerOutput(self, "Oil Temp", Temps.Oil)
     end
-    if SelfTbl.LastOilPressure ~= Round(SelfTbl.OilPressureBar, 1) then
-        SelfTbl.LastOilPressure = Round(SelfTbl.OilPressureBar, 1)
+    if SelfTbl.LastOilPressure ~= Round(OilPressure, 1) then
+        SelfTbl.LastOilPressure = Round(OilPressure, 1)
         WireLib.TriggerOutput(self, "Oil Pressure", SelfTbl.LastOilPressure)
     end
-    if SelfTbl.LastOilWarning ~= (not SelfTbl.OilPressureOK) then
-        SelfTbl.LastOilWarning = not SelfTbl.OilPressureOK
-        WireLib.TriggerOutput(self, "Oil Warning", SelfTbl.LastOilWarning and 1 or 0)
+    if SelfTbl.LastOilWarning ~= not OilWarning then
+        SelfTbl.LastOilWarning = not OilWarning
+        WireLib.TriggerOutput(self, "Oil Warning", OilWarning and 1 or 0)
     end
 end
 

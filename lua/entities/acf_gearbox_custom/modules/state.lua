@@ -291,11 +291,11 @@ do -- Movement -----------------------------------------
                         Multiplier = Link.Side == 0 and LMult or RMult
                     end
 
-                    local Target = InputRPM * Multiplier
-                    local ReqTq = (Target - WheelRPM) * InputInertia * Clutch
+                    local Target   = InputRPM * Multiplier
+                    local ReqTq    = (Target - WheelRPM) * InputInertia * Clutch
+                    local Capacity = SelfTbl.MaxTorque * Clutch
 
-                    -- TODO: Real compression brake torque would go here instead.
-                    Link.ReqTq = max(ReqTq, -abs(ReqTq) * 0.05) -- Boomer, 0.05 is a magic number
+                    Link.ReqTq = Clamp(ReqTq, -Capacity, Capacity)
                     TotalReqTq = TotalReqTq + Link.ReqTq
                 end
 

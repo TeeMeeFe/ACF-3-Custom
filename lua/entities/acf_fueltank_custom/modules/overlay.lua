@@ -29,8 +29,8 @@ function ENT:ACF_UpdateOverlayState(State)
     if FuelType and FuelType.FuelTankOverlay then
         FuelType.FuelTankOverlay(self.Amount, State)
     else
-        local FuelAmount   = Round(self.Amount, 2)
-        local FuelCapacity = Round(self.Capacity, 2)
+        local FuelAmount   = Round(self.Amount or 0, 2)
+        local FuelCapacity = Round(self.Capacity or 1, 2)
 
         State:AddProgressBar("Remaining Fuel", FuelAmount, FuelCapacity, " L")
     end

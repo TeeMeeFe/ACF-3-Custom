@@ -112,7 +112,7 @@ ACF.RegisterClassLink("acf_engine_custom", "acf_radiator", function(Engine, Targ
     local Temperature = Engine.Temperature
     local HighestTemp = math.max(Temperature.Coolant, Temperature.Oil)
 
-    if HighestTemp > ACF.UnpressurizedTemperature or (Target.CoreTemperature - HighestTemp) > 20 then return false, "Too hot! Please wait for the engine to cool down!" end
+    if HighestTemp > ACF.RadUnpressTemperature or math.abs(Target.CoreTemperature - HighestTemp) > 20 then return false, "Too hot! Please wait for the engine to cool down!" end
 
     Engine.Radiators[Target] = true
     Target.Engine = Engine

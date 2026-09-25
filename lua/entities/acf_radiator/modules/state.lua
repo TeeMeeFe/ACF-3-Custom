@@ -46,7 +46,7 @@ function ENT:CalcTemp(InputTemp, InputHeat, InputFlow, DeltaTime, Velocity)
     local Density      = SelfTbl.Density      -- In Grams per Cubic Centimeter or Kilograms per Liter
     local SpecificHeat = SelfTbl.SpecificHeat -- In Kilojoules per Kilogram
 
-    local CoreEff      = SelfTbl.CoreEff or 1.0
+    local CoreEff      = SelfTbl.CoreEff
 
     local AmbTemp      = SelfTbl.AmbTemp
     local Temperature  = SelfTbl.InputTemperature

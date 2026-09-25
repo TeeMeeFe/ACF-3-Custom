@@ -63,8 +63,8 @@ local function UpdateEngine(Entity, ClassData)
 	local OIL_P_RELIEF_REF    = 5.0   -- bar, reference relief cap at RefJournalDiam
 	local REF_JOURNAL_DIAM_CM = 8.0 * 0.35  -- reference ~8cm-bore engine — TUNE
 
-	local JournalDiam_cm  = Compute.Bore * 0.35
-	local JournalSpecMult = sqrt(JournalDiam_cm / REF_JOURNAL_DIAM_CM)
+	local JournalDiam     = Compute.Bore * 0.35
+	local JournalSpecMult = sqrt(JournalDiam / REF_JOURNAL_DIAM_CM)
 
 	-- Class compute table assignments
 	Entity.ACF.Model 		    = Model
@@ -94,9 +94,9 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.PipeLeakRate         = LeakRate
 	Entity.Mass                 = Compute.ScaledMass
 	Entity.LimitRPM   		    = Compute.LimitRPM
-	Entity.OilPMinRun 			= OIL_P_MIN_RUN_REF * JournalSpecMult
+	Entity.OilPressMinRun 		= OIL_P_MIN_RUN_REF * JournalSpecMult
 	Entity.OilPRelief 			= OIL_P_RELIEF_REF  * JournalSpecMult
-	Entity.OilKPump 		    = Entity.OilPMinRun / max(Entity.IdleRPM, 1)
+	Entity.OilKPump 		    = Entity.OilPressMinRun / max(Entity.IdleRPM, 1)
 	Entity.OilSumpTilt  		= Compute.OilSumpTilt
 	Entity.PeakTorque			= Compute.PeakTorque
 	Entity.PeakPower			= Compute.PeakPower
@@ -188,7 +188,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.IsStalled		    = false
 	self.PrevVelocity  		= Vector(0, 0, 0)
 	self.OilViscosity       = 0
-	self.OilPressureBar     = 0
+	self.OilPressure        = 0
 	self.OilStarvation 		= 0
 	self.OilPressureOK 		= true
 	self.State         		= "Idle"

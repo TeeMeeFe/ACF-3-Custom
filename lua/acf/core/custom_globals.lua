@@ -5,6 +5,7 @@ do -- Globals
     ACF.AmbientTemperature    = 288.15 -- Override the previous one
     ACF.RoomTemperature       = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
     ACF.RadiatorLinkDistance  = 96     -- Distance in units at which linking radiators are possible.
+    ACF.GeeDegreesPerGees     = 5.7    -- ° equivalent tilt per G of lateral/longitudinal force
     -- Heat split as fraction
     ACF.HeatFractionToCoolant = 0.70   -- Ratio of the heat generated that goes to coolant, rest goes to oil.
     -- Heat Generation scalars
