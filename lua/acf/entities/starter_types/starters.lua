@@ -1,15 +1,15 @@
-ACF.Classes.DefineClass("ACF.CustomEngines.StarterMotor", "ACF.CustomEngines.ElectricBlock", function(CLASS, BASE)
+ACF.Classes.DefineClass("ACF.CustomEngines.Starters", function() end)
+
+ACF.Classes.DefineClass("ACF.CustomEngines.ElectricMotor", "ACF.CustomEngines.Starters", function(CLASS, BASE)
     CLASS.Name         = "Electric Starter Motor"
     CLASS.Description  = "An electric motor meant to be used to start engines of varying sizes and layouts"
     CLASS.CanMenuSpawn = false
-    CLASS.Model        = "models/engines/emotor-standalone-tiny.mdl"
+    CLASS.Model        = "models/acf/core/t_drive_e.mdl"-- "models/engines/emotor-standalone-tiny.mdl"
     CLASS.SoundPath    = "acf_custom/starter/ignition_loop.wav"
-
-    MENU_FIELD("Boolean", "HasStarter", {Default = true})
-    FIELD("Number", "MaxDisplacement", {Value = 13.5}) -- Maximum displacement in liters that an engine can have for this starter.
-    -- The largest engine in a PRODUCTION car is the Pierce-Arrow model 66, produced around 1912-1918. 
-    -- Recovered from: https://www.guinnessworldrecords.com/world-records/largest-car-engine
-    FIELD("String", "SoundPath",   {Default = CLASS.SoundPath})
+    CLASS.MaxDisplacement = ACF.MaxDispForElecStarter
+    CLASS.RotorMass_K  = 0.0028  -- kg per cm³
+    CLASS.BlockMass_K  = 0.018   -- kg per cm³
+    CLASS.StatorMass_K = 0.058   -- kg per cm³
 
     -- Minimum cranking RPM needed for combustion to fire reliably:
     -- Petrol (spark): ~100 RPM, spark can ignite at low compression heat.
@@ -23,9 +23,11 @@ ACF.Classes.DefineClass("ACF.CustomEngines.StarterMotor", "ACF.CustomEngines.Ele
     --- @param Params:table ;The table with the engine parameters.
     --- @return number|nil ;The minimum torque needed to start the engine, or nil if we exceed the maximum displacement.
     function CLASS.Compute(_, _, Params)
-        local Displacement = Params.Displacement.InLiters
-        local MaxDisplacement = ACF.Classes.GetTypeFieldByName(CLASS, "MaxDisplacement").Options
-        if Displacement > MaxDisplacement.Value then return end
+        local Displacement = istable(Params.Displacement) and Params.Displacement.InLiters or Params.Displacement
+        if not Displacement then return end
+
+        local MaxDisplacement = CLASS.MaxDisplacement
+        if Displacement > MaxDisplacement then return end
 
         local IdleRPM      = Params.IdleRPM
         local IgnitionType = Params.IgnitionType
@@ -40,9 +42,9 @@ ACF.Classes.DefineClass("ACF.CustomEngines.StarterMotor", "ACF.CustomEngines.Ele
         local TorqueStall = K_FRIC * (CrankRPM ^ ACF.FrictionalRPMExponent) * Displacement
 
         -- Get the mass too, its computed by the base class so we selectively take and calculate it ourselves. 
-        local BlockMass = Displacement * BASE.BlockMass_K
-        local RotorMass = Displacement * BASE.RotorMass_K
-        local StatorMass = Displacement * BASE.StatorMass_K
+        local BlockMass  = Displacement * CLASS.BlockMass_K
+        local RotorMass  = Displacement * CLASS.RotorMass_K
+        local StatorMass = Displacement * CLASS.StatorMass_K
 
         local ModelMass = BlockMass + RotorMass + StatorMass
 
@@ -52,6 +54,17 @@ ACF.Classes.DefineClass("ACF.CustomEngines.StarterMotor", "ACF.CustomEngines.Ele
             CrankRPM = CrankRPM
         }
     end
+    -- I gotta do something about this shit, it cannot update
+    function CLASS.CreateMenu(SubMenu, Context)
+        Context.IdleRPM = 850 -- Hardcoded estimate
+        Context.IgnitionType = Context.EngineType.IgnitionType
 
-    function CLASS.CreateMenu() end
+        local Computed = CLASS.Compute(_, _, Context)
+
+        SubMenu:AddModelPreview(CLASS.Model, true, "Tertiary")
+        SubMenu:AddLabel(
+            "Torque: " .. math.Round(Computed.TorqueStall, 2) .. "Nm \n" ..
+            "Mass: " .. math.Round(Computed.ScaledMass, 2) .. "Kg \n" ..
+            "RPM: " .. Computed.CrankRPM)
+    end
 end)

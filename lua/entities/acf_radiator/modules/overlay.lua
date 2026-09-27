@@ -56,5 +56,5 @@ function ENT:ACF_UpdateOverlayState(State)
     local FreezingPoint = self.FreezePoint
     local BoilingPoint = self.BoilingPoint
 
-    State:AddCustomProgressBar("Temperature", Temperature, FreezingPoint, BoilingPoint, " °C", 0, LowColor, HighColor)
+    State:AddCustomProgressBar("Temperature", "Temperature", Temperature, FreezingPoint, BoilingPoint, 0, nil, LowColor, HighColor)
 end

@@ -13,22 +13,22 @@ local IsEntityValid = ACF.Optimizations.IsEntityValid
 local function UpdateEngine(Entity, ClassData)
 	Entity.ACF = Entity.ACF or {}
 
-	local Model = Entity:ACF_GetUserVar("CustomEngineModel") or ClassData.CustomEngineModel
+	local Model = Entity:ACF_GetUserVar("Model") or ClassData.Model
 	Entity:SetScaledModel(Model)
 
 	local Params = {
-		Pistons    = Entity:ACF_GetUserVar("CustomEnginePistons") or ClassData.CustomEnginePistons,
-		Bore	   = Entity:ACF_GetUserVar("CustomEngineBore") or ClassData.CustomEngineBore,
-		Stroke 	   = Entity:ACF_GetUserVar("CustomEngineStroke") or ClassData.CustomEngineStroke,
-		Clearance  = Entity:ACF_GetUserVar("CustomEngineClearance") or ClassData.CustomEngineClearance,
-		BankAngle  = Entity:ACF_GetUserVar("CustomEngineBankAngle") or ClassData.CustomEngineBankAngle,
-		BankAmount = Entity:ACF_GetUserVar("CustomEngineBankAmount") or ClassData.CustomEngineBankAmount,
+		Pistons    = Entity:ACF_GetUserVar("Pistons") or ClassData.Pistons,
+		Bore	   = Entity:ACF_GetUserVar("Bore") or ClassData.Bore,
+		Stroke 	   = Entity:ACF_GetUserVar("Stroke") or ClassData.Stroke,
+		Clearance  = Entity:ACF_GetUserVar("Clearance") or ClassData.Clearance,
+		BankAngle  = Entity:ACF_GetUserVar("BankAngle") or ClassData.BankAngle,
+		BankAmount = Entity:ACF_GetUserVar("BankAmount") or ClassData.BankAmount,
 	}
 
 	local EngineClass = Entity.EngineFuelType
 	local TypeDef     = GetType(EngineClass)
 	local FuelTypes   = GetType(EngineClass).Fuel
-	local StarterType = Entity:ACF_GetUserVar("StarterType")
+	local StarterType = Entity:GetStarterType()
 
 	local ExtraEngineFields = {
 		PistonSpeed  = TypeDef.PistonSpeed,
@@ -215,7 +215,7 @@ local function OnUpdateEntity(Entity)
 	local SelfTbl = Entity:GetTable()
 	if not SelfTbl.HasStarter then return end
 
-	local StarterData = Entity:GetStarterType()
+	local StarterData = SelfTbl.StarterType
 
 	-- Rebuild the starter.
 	if not IsValid(SelfTbl.Starter) and Entity.Displacement.InLiters < StarterData.MaxDisplacement then

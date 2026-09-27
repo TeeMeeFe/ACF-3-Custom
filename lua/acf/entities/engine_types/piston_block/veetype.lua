@@ -14,15 +14,15 @@ Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBl
     CLASS.CubicReductionFactor = 0.75 -- Inverse ratio of empty mass volume an engine has, so it doesn't scale like if it was a solid piece.
     CLASS.Sign                 = "V"
 
-    MENU_FIELD("String", "CustomEngineModel",     {Default = "models/engines/v8s.mdl"})
-    MENU_FIELD("Number", "CustomEnginePistons",   {Min = 4,    Max = 12, Default = 8,   Decimals = 0, IsEvenNumber = true})
-    MENU_FIELD("Number", "CustomEngineBore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineStroke",    {Min = 1,    Max = 20, Default = 4.2, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineClearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineBankAngle", {Min = 60,   Max = 120, Default = 90, Decimals = 0}) -- in Degrees
+    MENU_FIELD("String", "Model",     {Default = "models/engines/v8s.mdl"})
+    MENU_FIELD("Number", "Pistons",   {Min = 4,    Max = 12, Default = 8,   Decimals = 0, IsEvenNumber = true})
+    MENU_FIELD("Number", "Bore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Stroke",    {Min = 1,    Max = 20, Default = 4.2, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Clearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "BankAngle", {Min = 60,   Max = 120, Default = 90, Decimals = 0}) -- in Degrees
 
-    MENU_FIELD("String", "CustomEngineCylinderHead", {Default = "Pushrod"})
-    MENU_FIELD("String", "CustomEngineCamshaftType", {Default = "Stock"})
+    MENU_FIELD("String", "CylinderHeadType", {Default = "Pushrod"})
+    MENU_FIELD("String", "CamshaftType", {Default = "Stock"})
 
     -- Two banks of cylinders at BankAngle degrees.  Common angles:
     --   60° V6  — compact but inherently uneven without shared crank pins
@@ -82,8 +82,8 @@ Classes.DefineClass("ACF.CustomEngines.VTypeEngine", "ACF.CustomEngines.PistonBl
         Params.PistonSpeed  = Args.PistonSpeed
         Params.TorqueScale  = Args.TorqueScale
         Params.TorqueCurve  = Args.TorqueCurve
-        -- Params.HeadShape    = ACF.GetClientData("CustomEngineCylinderHead", Classes.GetTypeFieldByName(CLASS, "CustomEngineCylinderHead").Options.Default)
-        -- Params.Cam_mod      = ACF.GetClientData("CustomEngineCamshaftType", Classes.GetTypeFieldByName(CLASS, "CustomEngineCamshaftType").Options.Default)
+        -- Params.HeadShape    = ACF.GetClientData("CylinderHeadType", Classes.GetTypeFieldByName(CLASS, "CylinderHeadType").Options.Default)
+        -- Params.Cam_mod      = ACF.GetClientData("CamshaftType", Classes.GetTypeFieldByName(CLASS, "CamshaftType").Options.Default)
 
         -- The base class has the implementation of this method, so we redict this info there instead
         local Computed = BASE.Compute(CLASS, Layout, Params)

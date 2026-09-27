@@ -5,15 +5,14 @@ local Overlay = ACF.Overlay
 
 -- Data slots are as follows:
 --   [1]: Label
---   [2]: Value 
---   [3]: Min Value
---   [4]: Max Value
---   [5]: Unit?
---   [6]: Decimals?
---   [7]: Min Color?
---   [8]: Max Color?
-
-PrintTable({Overlay})
+--   [2]: Type?
+--   [3]: Value 
+--   [4]: Min Value
+--   [5]: Max Value
+--   [6]: Unit?
+--   [7]: Decimals?
+--   [8]: Min Color?
+--   [9]: Max Color?
 
 local PROGRESS_EMPTY = Color(66, 96, 116)
 local PROGRESS_FULL  = Color(112, 191, 243)
@@ -30,17 +29,26 @@ local function SafeClampedRatio(Value, Minimum, Maximum)
 end
 
 local function GetPropertiesSimpleProgress(Slot)
-    local Value      = Slot.Data[2]
-    local MinValue   = Slot.Data[3] or 0
-    local MaxValue   = Slot.Data[4] or 1
-    local Unit       = Slot.NumData >= 5 and Slot.Data[5] or ""
-    local Decimals   = Slot.NumData >= 6 and Slot.Data[6] or 0
+    local Type       = Slot.Data[2] or ""
+    local Value      = Slot.Data[3]
+    local MinValue   = Slot.Data[4] or 0
+    local MaxValue   = Slot.Data[5] or 1
+    local Unit       = Slot.NumData >= 6 and Slot.Data[6] or ""
+    local Decimals   = Slot.NumData >= 7 and Slot.Data[7] or 0
 
-    local MinColor   = Slot.NumData >= 7 and Slot.Data[7] or PROGRESS_EMPTY
-    local MaxColor   = Slot.NumData >= 8 and Slot.Data[8] or PROGRESS_FULL
+    local MinColor   = Slot.NumData >= 8 and Slot.Data[8] or PROGRESS_EMPTY
+    local MaxColor   = Slot.NumData >= 9 and Slot.Data[9] or PROGRESS_FULL
 
     local Ratio      = SafeClampedRatio(Value, MinValue, MaxValue)
-    return ("%." .. Decimals .. "f%s"):format(Value, Unit), Ratio, MinColor, MaxColor
+
+    -- Custom returned format value 
+    if Type == "Temperature" then
+        local ToFahrenheit = math.Round((Value * 1.8) + 32, Decimals)
+
+        return ("%." .. Decimals .. "f°C / " .. ToFahrenheit .. "°F"):format(Value), Ratio, MinColor, MaxColor
+    else
+        return ("%." .. Decimals .. "f%s"):format(Value, Unit), Ratio, MinColor, MaxColor
+    end
 end
 
 local function Render(Slot, TextMethod)

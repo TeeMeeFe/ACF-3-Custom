@@ -6,10 +6,14 @@ do -- Globals
     ACF.RoomTemperature       = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
     ACF.RadiatorLinkDistance  = 96     -- Distance in units at which linking radiators are possible.
     ACF.GeeDegreesPerGees     = 5.7    -- ° equivalent tilt per G of lateral/longitudinal force
+    -- The largest engine in a PRODUCTION car is the Pierce-Arrow model 66, produced around 1912-1918. 
+    -- Recovered from: https://www.guinnessworldrecords.com/world-records/largest-car-engine
+    ACF.MaxDispForElecStarter = 13.5   -- Maximum displacement in liters that an engine can have for this electric starter.
+    ACF.MaxDispForHydroStarter = 27.8  -- Maximum displacement in liters that an engine can have for this hydraulic starter.
     -- Heat split as fraction
     ACF.HeatFractionToCoolant = 0.70   -- Ratio of the heat generated that goes to coolant, rest goes to oil.
     -- Heat Generation scalars
-    ACF.HeatFrozenConduction  = 0.015   -- Frozen fluid still conducts, just much slower.
+    ACF.HeatFrozenConduction  = 0.015  -- Frozen fluid still conducts, just much slower.
     ACF.HeatGenerationAtIdle  = 0.15   -- Ratio as baseline heat/s when the engine is active and idling.
     ACF.HeatGenerationScalar  = 20     -- Scalar (aka multiplier) of heat generated over time. Higher is faster.
     -- Radiator constants 

@@ -1,5 +1,6 @@
 local ACF = ACF
-local Custom = ACF.Custom
+local Custom = ACF.Custom or {}
+ACF.Custom = Custom
 
 local PI    = math.pi
 local Clamp = math.Clamp

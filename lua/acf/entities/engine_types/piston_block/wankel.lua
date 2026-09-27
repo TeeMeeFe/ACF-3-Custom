@@ -12,16 +12,16 @@ Classes.DefineClass("ACF.CustomEngines.RotaryEngine", "ACF.CustomEngines.PistonB
     CLASS.Sign                 = "R"
     CLASS.WankelPowerStrokes   = 3
 
-    MENU_FIELD("String", "CustomEngineModel",     {Default = "models/engines/wankel_4_med.mdl"})
-    MENU_FIELD("Number", "CustomEnginePistons",   {Min = 2,    Max = 4,  Default = 4,   Decimals = 0})
+    MENU_FIELD("String", "Model",     {Default = "models/engines/wankel_4_med.mdl"})
+    MENU_FIELD("Number", "Pistons",   {Min = 2,    Max = 4,  Default = 4,   Decimals = 0})
     -- Bore = rotor generating radius (R), Stroke = eccentricity (e)
-    MENU_FIELD("Number", "CustomEngineBore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineStroke",    {Min = 0.5,  Max = 3,  Default = 1.0, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineClearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Bore",      {Min = 1,    Max = 20, Default = 4.0, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Stroke",    {Min = 0.5,  Max = 3,  Default = 1.0, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Clearance", {Min = 0.05, Max = 4,  Default = 0.5, Decimals = 2}) -- in Centimeters
 
     -- Wankels have no valves at all. Leaving these commented just for demonstration purposes.
-    -- MENU_FIELD("String", "CustomEngineCylinderHead", {Default = "Pushrod"})
-    -- MENU_FIELD("String", "CustomEngineCamshaftType", {Default = "Stock"})
+    -- MENU_FIELD("String", "CylinderHeadType", {Default = "Pushrod"})
+    -- MENU_FIELD("String", "CamshaftType", {Default = "Stock"})
 
     function CLASS.GetLayoutFactors(Pistons)
         if not Pistons then return end -- Rotors in this case
@@ -50,8 +50,8 @@ Classes.DefineClass("ACF.CustomEngines.RotaryEngine", "ACF.CustomEngines.PistonB
         Params.PistonSpeed  = Args.PistonSpeed
         Params.TorqueScale  = Args.TorqueScale
         Params.TorqueCurve  = Args.TorqueCurve
-        -- Params.HeadShape    = ACF.GetClientData("CustomEngineCylinderHead", Classes.GetTypeFieldByName(CLASS, "CustomEngineCylinderHead").Options.Default)
-        -- Params.Cam_mod      = ACF.GetClientData("CustomEngineCamshaftType", Classes.GetTypeFieldByName(CLASS, "CustomEngineCamshaftType").Options.Default)
+        -- Params.HeadShape    = ACF.GetClientData("CylinderHeadType", Classes.GetTypeFieldByName(CLASS, "CylinderHeadType").Options.Default)
+        -- Params.Cam_mod      = ACF.GetClientData("CamshaftType", Classes.GetTypeFieldByName(CLASS, "CamshaftType").Options.Default)
 
         -- The base class has the implementation of this method, so we redict this info there instead
         local Computed = BASE.Compute(CLASS, Layout, Params)

@@ -14,21 +14,21 @@ ACF.Entities.AutoRegister(20260916, function(CLASS)
         OnlyAllowSubtypes = true,
         InstantiateTypeForDefault = "ACF.CustomEngineTypes.GenericPetrol"
     })
-    MENU_FIELD("ACF.CustomEngines.ElectricBlock", "StarterType", {
+    MENU_FIELD("ACF.CustomEngines.Starters", "StarterType", {
         OnlyAllowSubtypes = true,
-        InstantiateTypeForDefault = "ACF.CustomEngines.StarterMotor"
+        InstantiateTypeForDefault = "ACF.CustomEngines.ElectricMotor"
     })
 
-    MENU_FIELD("String", "CustomEngineModel",      {Default = "models/engines/inline4s.mdl"})
-    MENU_FIELD("Number", "CustomEnginePistons",    {Min = 1,    Max = 16,  Default = 4,   Decimals = 0, IsEvenNumber = true})
-    MENU_FIELD("Number", "CustomEngineBore",       {Min = 1,    Max = 20,  Default = 4.0, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineStroke",     {Min = 1,    Max = 20,  Default = 4.2, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineClearance",  {Min = 0.05, Max = 4,   Default = 0.5, Decimals = 2}) -- in Centimeters
-    MENU_FIELD("Number", "CustomEngineBankAngle",  {Min = 60,   Max = 120, Default = 90,  Decimals = 0}) -- in Degrees
-    MENU_FIELD("Number", "CustomEngineBankAmount", {Min = 1,    Max = 4,   Default = 1,   Decimals = 0}) -- in Degrees
+    MENU_FIELD("String", "Model",      {Default = "models/engines/inline4s.mdl"})
+    MENU_FIELD("Number", "Pistons",    {Min = 1,    Max = 16,  Default = 4,   Decimals = 0, IsEvenNumber = false})
+    MENU_FIELD("Number", "Bore",       {Min = 1,    Max = 20,  Default = 4.0, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Stroke",     {Min = 1,    Max = 20,  Default = 4.2, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "Clearance",  {Min = 0.05, Max = 4,   Default = 0.5, Decimals = 2}) -- in Centimeters
+    MENU_FIELD("Number", "BankAngle",  {Min = 60,   Max = 120, Default = 90,  Decimals = 0}) -- in Degrees
+    MENU_FIELD("Number", "BankAmount", {Min = 1,    Max = 4,   Default = 1,   Decimals = 0}) -- in Degrees
 
-    MENU_FIELD("String", "CustomEngineCylinderHead", {Default = "Pushrod"})
-    MENU_FIELD("String", "CustomEngineCamshaftType", {Default = "Stock"})
+    MENU_FIELD("String", "CylinderHeadType", {Default = "Pushrod"})
+    MENU_FIELD("String", "CamshaftType",     {Default = "Stock"})
     -- Nothing to validate: the Engine field is constrained to ACF.Engines.* subtypes by the serializer.
     function CLASS:VerifyData() end
 end, "Custom Engine")
