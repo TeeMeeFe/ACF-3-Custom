@@ -11,14 +11,16 @@ function ENT:ACF_UpdateOverlayState(State)
     -- Actual state
     if self.ACF.Health == 0 then
         State:AddError("Destroyed")
-    elseif self.ACF.Health ~= 0 and self.Amount == 0 then
-        State:AddError("No coolant left!")
-    elseif self.ACF.Health ~= 0 and self.Active then
-        State:AddSuccess("Active")
-    elseif self.ACF.Health ~= 0 and not self.Active and not IsValid(self.Engine) then
-        State:AddWarning("Idle, and not linked to an engine!")
     else
-        State:AddWarning("Idle")
+        if self.Amount == 0 then
+            State:AddError("No coolant left!")
+        elseif self.Active then
+            State:AddSuccess("Active")
+        elseif not self.Active and not IsValid(self.Engine) then
+            State:AddWarning("Idle, and not linked to an engine!")
+        else
+            State:AddWarning("Idle")
+        end
     end
     -- Warnings
     if self.IsLeaking and self.LeakingRate > 0 then

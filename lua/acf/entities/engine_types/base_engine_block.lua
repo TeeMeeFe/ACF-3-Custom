@@ -53,7 +53,7 @@ end)
 Classes.DefineClass("ACF.CustomEngineTypes.GenericDiesel", "ACF.CustomEngineTypes.BaseEngineType", function(CLASS)
     CLASS.Name         = "Generic Diesel Engine"
     CLASS.ShortName    = "Diesel"
-    CLASS.TorqueScale  = 0.25
+    CLASS.TorqueScale  = 0.35
     CLASS.TorqueCurve = { 0, 0.7, 0.96, 1, 0.97, 0.93, 0.82, 0.7, 0.3, 0 }
     CLASS.HealthMult   = 0.5
     CLASS.PistonSpeed  = 13 -- m/s
