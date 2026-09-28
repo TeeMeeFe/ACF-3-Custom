@@ -363,7 +363,8 @@ do -- Movement -----------------------------------------
 
         -- Effectors
         for Effector, Link in pairs(SelfTbl.Effectors) do
-            Link:TransferEffector(Effector, Link.ReqTq * AvailTq, DeltaTime, MassRatio, FlyRPM, Direction)
+            local Share = (EntTbl.DownstreamInertia or 0) / TotalInertia
+            Link:TransferEffector(Effector, StageTorque * Share, DeltaTime, MassRatio, FlyRPM, Direction)
         end
 
         -- Chassis reaction torque: Newton's third law makes the body twist opposite to the drive direction when power is applied
