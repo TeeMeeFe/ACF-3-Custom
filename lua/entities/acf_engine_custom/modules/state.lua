@@ -385,6 +385,7 @@ do -- Actual engine rpm and torque calculations
         if GearboxCount > 0 then
             GearboxRPM = GearboxRPM / GearboxCount
             GearboxTotalRatio = GearboxTotalRatio / GearboxCount
+            GearboxLoad = GearboxLoad / GearboxCount
         end
 
         -- Pumping/compression braking
@@ -396,7 +397,7 @@ do -- Actual engine rpm and torque calculations
         local SlipDifference = GearboxRPM - FlyRPM
         local MaxTq = (abs(SlipDifference) * GearboxInertia) / max(GearboxTotalRatio, 0.001)
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
-        local IncomingInertia = max(FlyInertia, GearboxInertia * GearboxLoad)
+        local IncomingInertia = FlyInertia + GearboxInertia * GearboxLoad
 
         local EngineTorque = (Torque + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5))) - Friction -- Limited compression brake slip
 
@@ -405,37 +406,42 @@ do -- Actual engine rpm and torque calculations
 
         -- This is just to update the overlay
         -- Here ideally i'd also check if the starter is engaged and update that condition as well.
-        if FlyRPM <= IdleRPM * 0.9 and SrtTable.IsCranking then
-            SelfTbl.State = "Cranking"
-        elseif FlyRPM <= IdleRPM * 0.9 and not SrtTable.IsCranking then
-            SelfTbl.State = "Stalling"
+        if FlyRPM <= IdleRPM * 0.9 then
+            if SrtTable.IsCranking then
+                SelfTbl.State = "Cranking"
+            else
+                SelfTbl.State = "Stalling"
+            end
         else
             SelfTbl.State = "Active"
         end
-        SelfTbl.Torque = Torque
+
+        SelfTbl.Torque = EngineTorque
         SelfTbl.Friction = Friction -- Assembly Friction
 
-        -- This is the presently available torque from the engine
-        local TorqueDiff = Clamp(FlyRPM - IdleRPM, -TotalReqTq, TotalReqTq) * IncomingInertia
-
-        -- Calculate the ratio of total requested torque versus what's available
-        local AvailRatio = min(abs(TorqueDiff) / max(abs(TotalReqTq), 1e-6), 1)
-
         local MassRatio = SelfTbl.MassRatio
+        local DriveTorque = Torque + StrTorque - FeedbackTq
 
-        -- Split the torque fairly between the gearboxes who need it
-        for Ent, Link in pairs(BoxesTbl) do
-            Link:TransferGearbox(Ent, Link.ReqTq * AvailRatio * MassRatio, DeltaTime, MassRatio, FlyRPM)
+        if GearboxCount > 0 then
+            for Ent, Link in pairs(BoxesTbl) do
+                local EntTbl = ENTITY.GetTable(Ent)
+
+                if not EntTbl.Disabled then
+                    local Share = (EntTbl.DownstreamInertia or 0) / max(GearboxInertia, 1e-6)
+                    Link:TransferGearbox(Ent, DriveTorque * Share, DeltaTime, MassRatio, FlyRPM)
+                end
+            end
         end
 
         SelfTbl.FlyRPM = FlyRPM
 
         -- Stall detection: RPM collapsed below the stall threshold while the load exceeded output.
         -- SetActive handles the restart guard; CalcRPM just flags and shuts down.
-        if FlyRPM <= IdleRPM * 0.33 and (GearboxTotalRatio == 0 and not SrtTable.IsCranking) or (FlyRPM <= IdleRPM * 0.33 and TotalReqTq > TorqueDiff) then
-            SelfTbl.IsStalled = true
-            SetActive(self, false, SelfTbl)
-        end
+        -- TODO: FIX THIS!
+        -- if FlyRPM <= IdleRPM * 0.33 and (FeedbackTq > EngineTorque and not SrtTable.IsCranking) then
+        --     SelfTbl.IsStalled = true
+        --     SetActive(self, false, SelfTbl)
+        -- end
 
         SelfTbl.UpdateSound(self, SelfTbl)
         SelfTbl.UpdateOutputs(self, SelfTbl)

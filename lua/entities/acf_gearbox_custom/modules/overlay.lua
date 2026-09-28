@@ -3,6 +3,8 @@ local ACF = ACF
 local Round = math.Round
 local floor = math.floor
 
+ENT.OverlayDelay = 0.1
+
 function ENT:ACF_UpdateOverlayState(State)
     local Final  = ACF.ConvertGearRatio(self.FinalDrive, self.GearboxLegacyRatio)
     local Torque = Round(self.MaxTorque * ACF.TorqueMult * ACF.NmToFtLb)

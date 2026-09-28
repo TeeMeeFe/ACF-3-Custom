@@ -118,8 +118,8 @@ function ENT:CalcTemp(InputTemp, InputHeat, InputFlow, DeltaTime, Velocity)
         (CoreTemp - AmbTemp) * Percentage * ThermFrac * AirFactor * DeltaTime)
 
     -- Frozen conduction penalty applies regardless of pressure state.
-    local ConductionMult = SelfTbl.IsFrozen and ACF.HeatFrozenConduction or 1.0
-    CoreToAir = CoreToAir * ConductionMult
+    local ConductionMult = SelfTbl.IsFrozen and ACF.HeatFrozenConduction or 1
+    CoreToAir = CoreToAir * ConductionMult * (not SelfTbl.Active and ACF.HeatGenerationScalar or 1)
 
     CoreTemp = CoreTemp + (CoolantToCore - CoreToAir) / ACF.RadCoreHeatCapacity
     SelfTbl.CoreTemperature = max(AmbTemp, CoreTemp)
