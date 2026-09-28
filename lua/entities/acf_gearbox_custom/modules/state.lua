@@ -216,9 +216,9 @@ do -- Movement -----------------------------------------
         local GearRatio = SelfTbl.GearRatio
 
         if GearRatio == 0 then
-            SelfTbl.TotalRatio   = 0
+            SelfTbl.TotalRatio = 0
             SelfTbl.DownstreamInertia = 0
-            SelfTbl.Load         = 0
+            SelfTbl.Load = 0
             return 0
         end
 
@@ -298,8 +298,9 @@ do -- Movement -----------------------------------------
 
         -- Automatic torque-converter slip penalty
         local Slop = SelfTbl.Automatic and 0.9 or 1.0
+        local Sign = GearRatio >= 0 and 1 or -1
         -- Reflect through this stage's own ratio, same direction gearboxes already scale torque.
-        local StageTorque = Torque * GearRatio * Loss * Slop
+        local StageTorque = Torque * Sign * Loss * Slop
 
         -- Direction forwarded to effectors so reversible props work
         local Direction = SelfTbl.Drive == 2 and -1 or 1
@@ -340,9 +341,10 @@ do -- Movement -----------------------------------------
                 WheelTorque = Clamp(StageTorque * Share * Clutch * Multiplier, -Capacity, Capacity)
 
                 Link:TransferWheel(Wheel, WheelTorque, DeltaTime)
-                WireLib.TriggerOutput(self, "Output Torque", WheelTorque)
-                SelfTbl.TorqueOutput = WheelTorque
             end
+
+            WireLib.TriggerOutput(self, "Output Torque", WheelTorque)
+            SelfTbl.TorqueOutput = WheelTorque
         end
 
         -- Downstream gearboxes
