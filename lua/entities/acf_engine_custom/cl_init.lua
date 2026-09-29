@@ -4,6 +4,8 @@ local Queued	= {}
 
 include("shared.lua")
 
+killicon.Add( "acf_engine_custom", "HUD/killicons/acf_engine_custom", color_white )
+
 function ENT:Update()
 	self.HitBoxes = ACF.GetHitboxes(self:GetModel())
 end

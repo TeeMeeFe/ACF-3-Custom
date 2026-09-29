@@ -5,6 +5,8 @@ local Queued	= {}
 
 include("shared.lua")
 
+killicon.Add( "acf_radiator", "HUD/killicons/acf_radiator", color_white )
+
 do	-- NET SURFER 2.0
     net.Receive("ACF_InvalidateRadiatorInfo", function()
         local Radiator = net.ReadEntity()
