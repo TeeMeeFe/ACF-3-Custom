@@ -1,6 +1,13 @@
 local Round = math.Round
 
-ENT.OverlayDelay = 0.1
+ENT.OverlayDelay = 1
+
+-- Copied from thermals.lua
+local COOL_WARN = 105
+local OIL_WARN  = 130
+
+local LowColor  = Color(66, 96, 116)
+local HighColor = Color(255, 128, 30)
 
 function ENT:ACF_UpdateOverlayState(State)
     local TorqueMult = self.GetTorqueMult() -- Janky i know, but i gotta get this to work first.
@@ -17,6 +24,9 @@ function ENT:ACF_UpdateOverlayState(State)
     local PowerBand  = {Min = Round(self.PowerBand.Min),
                         Max = Round(self.PowerBand.Max),
                         Width = Round(self.PowerBand.Band)}
+
+    local CoolTemp = self.Temperature.Coolant
+    local OilTemp = self.Temperature.Oil
 
     State:AddHeader(self.Name, 2)
     if not IsValid(self.Starter) and self.HasStarter then
@@ -35,11 +45,20 @@ function ENT:ACF_UpdateOverlayState(State)
 
     State:AddKeyValue("Type", self.Type)
     -- Unit conversion on bore and stroke, from Centimeters to Millimeters
-    State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))
-    State:AddKeyValue("Stroke", ("%s mm"):format(self.Stroke * 10))
+    if not self.IsWankel then
+        State:AddKeyValue("Bore", ("%s mm"):format(self.Bore * 10))
+        State:AddKeyValue("Stroke", ("%s mm"):format(self.Stroke * 10))
+    else
+        State:AddKeyValue("Radius", ("%s mm"):format(self.Bore * 10))
+        State:AddKeyValue("Eccentricity", ("%s mm"):format(self.Stroke * 10))
+    end
     State:AddKeyValue("Compression Ratio", ("%.0f:1"):format(self.CompressionRatio))
     State:AddKeyValue("Power", ("%s kW / %s hp @%s RPM"):format(PeakPower.InKW, PeakPower.InHP, PeakPower.AtRPM))
     State:AddKeyValue("Torque", ("%s Nm / %s ft-lb @%s RPM"):format(PeakTorque.InNm, PeakTorque.InFtLb, PeakTorque.AtRPM))
     State:AddKeyValue("Powerband", ("%s - %s RPM  Δ%s RPM"):format(PowerBand.Min, PowerBand.Max, PowerBand.Width))
     State:AddKeyValue("Redline", ("%.0f RPM"):format(self.RedlineRPM))
+
+    State:AddHeader("Temperatures", 2)
+    State:AddCustomProgressBar("Coolant", "Temperature", CoolTemp, 0, COOL_WARN, 0, nil, LowColor, HighColor)
+    State:AddCustomProgressBar("Oil", "Temperature", OilTemp, 0, OIL_WARN, 0, nil, LowColor, HighColor)
 end

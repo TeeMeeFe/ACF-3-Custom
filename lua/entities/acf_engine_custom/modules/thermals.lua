@@ -226,5 +226,6 @@ do -- State Handling
         SelfTbl.WasTimed = false -- Reset our timer just in case 
 
         CalcWear(self, SelfTbl, DeltaTime)
+        self:UpdateOverlay()
     end
 end

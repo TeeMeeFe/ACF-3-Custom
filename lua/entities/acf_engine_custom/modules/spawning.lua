@@ -89,6 +89,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.HealthMult			= TypeDef.HealthMult
 	Entity.ID                   = Name
 	Entity.IdleRPM				= Compute.IdleRPM
+	Entity.IsWankel             = Compute.IsWankel
 	Entity.IsStalled			= false
 	Entity.Layout				= Compute.Layout
 	Entity.PipeLeakRate         = LeakRate
@@ -152,7 +153,9 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 
 	self.ACF 				= {}
 	self.Active        		= false
+	self.AirMassFlow        = 0
 	self.AmbientTemp        = AmbientTemperature
+	self.AmbientPressure    = ACF.NominalAtmoPressure
 	self.EngineBlockType    = EngineBlockType
 	self.EngineFuelType     = EngineFuelType
 	self.ExhaustEntity 		= nil
@@ -161,11 +164,13 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.FuelLinkDistances  = {}
 	self.Gearboxes     		= {}
 	self.Radiators     		= {}
+	self.IntakeTemp         = AmbientTemperature
 	self.HasStarter         = true -- TODO: true for now, it should be a uservar
 	self.Starter            = nil
 	self.Friction           = 0
 	self.FuelPrimed         = false
 	self.MassRatio     		= 1
+	self.LastAirMassFlow    = 0
 	self.LastThink     		= 0
 	self.LastTorque    		= 0
 	self.LastFuelUsage 		= 0

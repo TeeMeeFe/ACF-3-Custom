@@ -326,15 +326,16 @@ do -- Actual engine rpm and torque calculations
             SetStarterActive(SelfTbl, false)
         end
 
+        local Mass_fuel
         -- Calculate fuel usage
         if IsEntityValid(FuelTank) then
             SelfTbl.FuelTank = FuelTank
             SelfTbl.FuelType = FuelTank.FuelType
 
-            local Consumption = SelfTbl.GetConsumption(self, Throttle, FlyRPM, FuelTank, SelfTbl) * DeltaTime
+            Mass_fuel = SelfTbl.GetConsumption(self, Throttle, FlyRPM, FuelTank, SelfTbl) * DeltaTime
 
-            SelfTbl.FuelUsage = SelfTbl.Active and 60 * Consumption / max(DeltaTime, 0.001) or 0 -- Clamp this bitch so it doesn't NaN out
-            ENTITY.GetTable(FuelTank).Consume(FuelTank, Consumption)
+            SelfTbl.FuelUsage = SelfTbl.Active and 60 * Mass_fuel / max(DeltaTime, 0.001) or 0 -- Clamp this bitch so it doesn't NaN out
+            ENTITY.GetTable(FuelTank).Consume(FuelTank, Mass_fuel)
         elseif ACF.RequireFuel then -- Stay active if fuel consumption is disabled
             SetActive(self, false, SelfTbl)
 
@@ -346,6 +347,32 @@ do -- Actual engine rpm and torque calculations
         -- Update rail pressure
         SelfTbl.RailPressure = min(SelfTbl.RailPressure + SelfTbl.RailBuildRate * DeltaTime, 1)
         SelfTbl.FuelPrimed   = SelfTbl.RailPressure >= 0.70  -- Fraction of full pressure considered "primed"
+
+        -- Calculate air flow
+        local Press_air = SelfTbl.AmbientPressure -- TODO: Boost from any forced induction would be added here.
+        local Rho_air   = (Press_air / (ACF.SpecificGasConstant * SelfTbl.IntakeTemp)) * 100 -- Effective air density
+        local VE        = 0.40 + (Throttle * 0.60) -- Volumetric efficiency
+        local Mass_air  = ((SelfTbl.Displacement.InLiters * FlyRPM / 120) * Rho_air * VE) / 1000 -- Total air mass being consumed
+
+        -- Lambda multiplier
+        local Lambda = Clamp((Mass_air / Mass_fuel) / 6.4, 0.4, 9.9) -- 14.7 is the Stoich_AFR from the fuel being used
+        local LambdaMult
+
+        if Lambda < 0.70 then
+            LambdaMult = 0.70
+        elseif Lambda < 0.85 then
+            LambdaMult = 0.90 + (Lambda - 0.70) / 0.15 * 0.10
+        elseif Lambda <= 1.00 then
+            LambdaMult = 1.00
+        elseif Lambda <= 1.05 then
+            LambdaMult = 1.00 - (Lambda - 1.00) / 0.05 * 0.10
+        elseif Lambda <= 1.30 then
+            LambdaMult = 0.90 - (Lambda - 1.05) / 0.25 * 0.90
+        else
+            LambdaMult = 0.0
+        end
+
+        LambdaMult = max(0, LambdaMult)
 
         -- Calculate the current torque from flywheel RPM
         local Torque, Friction = 0, SelfTbl.Friction or 0
@@ -399,7 +426,7 @@ do -- Actual engine rpm and torque calculations
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = FlyInertia + GearboxInertia * GearboxLoad
 
-        local EngineTorque = (Torque + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5))) - Friction -- Limited compression brake slip
+        local EngineTorque = ((Torque * LambdaMult) + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5)) ) - Friction -- Limited compression brake slip
 
         -- Let's accelerate the flywheel based on that torque
         FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia, 0)
@@ -416,7 +443,7 @@ do -- Actual engine rpm and torque calculations
             SelfTbl.State = "Active"
         end
 
-        SelfTbl.Torque = EngineTorque
+        SelfTbl.Torque = Torque
         SelfTbl.Friction = Friction -- Assembly Friction
 
         local MassRatio = SelfTbl.MassRatio
@@ -570,27 +597,4 @@ function ENT:CalcMassRatio(SelfTbl)
         SelfTbl.LastPhysMass = PhysMass
         WireLib.TriggerOutput(self, "Physical Mass", Round(PhysMass, 2))
     end
-end
-
-function ENT:ACF_Activate(Recalc)
-    local PhysObj = self.ACF.PhysObj
-    local Mass    = PhysObj:GetMass()
-    local Area    = PhysObj:GetSurfaceArea() * ACF.InchToCmSq
-    -- Fucking ArmoUr :face_vomiting: :face_vomiting: :face_vomiting: :face_vomiting: :face_vomiting:
-    -- Britons gave us americans the english language so we can sanitize it and have it sound more or less understandable and be more legible!
-    -- TODO: Replace this variable name and all instances of it with the correct word and fix the comment since its wrong lol
-    local Armour  = Mass * 1000 / Area / 0.78 * ACF.ArmorMod -- Density of steel = 7.8g cm3 so 7.8kg for a 1mx1m plate 1m thick
-    local Health  = Area / ACF.Threshold
-    local Percent = 1
-
-    if Recalc and self.ACF.Health and self.ACF.MaxHealth then
-        Percent = self.ACF.Health / self.ACF.MaxHealth
-    end
-
-    self.ACF.Area      = Area
-    self.ACF.Health    = Health * Percent * self.HealthMult
-    self.ACF.MaxHealth = Health * self.HealthMult
-    self.ACF.Armour    = Armour * (0.5 + Percent * 0.5)
-    self.ACF.MaxArmour = Armour
-    self.ACF.Type      = "Prop"
 end

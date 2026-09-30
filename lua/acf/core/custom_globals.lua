@@ -1,9 +1,12 @@
 local Sounds = ACF.Utilities.Sounds
 
 do -- Globals
-    ACF.SpeedOfSound          = 343    -- In Meters Per Second.
+    -- ACF.SpeedOfSound          = 343 -- In Meters Per Second.
     ACF.AmbientTemperature    = 288.15 -- Override the previous one
     ACF.RoomTemperature       = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
+    ACF.SpecificGasConstant   = 287    -- Specific gas constant of dry air in Joules per kilogram per degree Kelvin J/(kg*K) 
+                                       -- Recovered from: https://web.mit.edu/calculix_v2.7/CalculiX/ccx_2.7/doc/ccx/node240.html
+    ACF.NominalAtmoPressure   = 1.013  -- Measured atmospheric pressure at sea level, in bar (or 1 ATM of pressure)
     ACF.RadiatorLinkDistance  = 96     -- Distance in units at which linking radiators are possible.
     ACF.GeeDegreesPerGees     = 5.7    -- ° equivalent tilt per G of lateral/longitudinal force
     -- The largest engine in a PRODUCTION car is the Pierce-Arrow model 66, produced around 1912-1918. 

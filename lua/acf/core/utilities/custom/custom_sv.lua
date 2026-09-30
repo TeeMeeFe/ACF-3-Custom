@@ -85,6 +85,7 @@ function Custom.BuildTorqueCurve(TorqueCurve, MaxTorque, MaxRPM, IdleRPM, Displa
     local DoRedline    = REDLINE_TORQUE_FRAC and REDLINE_TORQUE_FRAC < 1.0
     local TorqueThresh = PeakTorque * REDLINE_TORQUE_FRAC
     local RedlineRPM   = 0
+    local FinalRedline = 0
 
     for I = 0, Steps do
         local RPM_I   = MaxRPM * I / Steps
@@ -98,6 +99,9 @@ function Custom.BuildTorqueCurve(TorqueCurve, MaxTorque, MaxRPM, IdleRPM, Displa
         -- Redline found, set it to be this value
         if DoRedline and I >= PeakTorqueIdx and T_Curve[I] >= TorqueThresh then
             RedlineRPM = RPM_I
+
+            -- Round to the nearest multiple of 250 
+            FinalRedline = floor((RedlineRPM / 250) + 0.5) * 250
         end
     end
 
@@ -123,7 +127,7 @@ function Custom.BuildTorqueCurve(TorqueCurve, MaxTorque, MaxRPM, IdleRPM, Displa
         PeakPower  = {InKW = PeakPower, InHP = PeakPower * ACF.KwToHp, AtRPM = PeakPowerAtRPM},
         PeakTorque = {InNm = PeakTorque, InFtLb = PeakTorque * ACF.NmToFtLb, AtRPM = PeakTorqueAtRPM},
         PowerBand  = {Band = abs(PowerbandMax - PowerbandMin), Min = PowerbandMin, Max = PowerbandMax},
-        RedlineRPM = RedlineRPM
+        RedlineRPM = FinalRedline
     }
 end
 
