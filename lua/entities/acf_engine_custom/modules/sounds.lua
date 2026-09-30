@@ -18,6 +18,7 @@ end
 function ENT:UpdateSound(SelfTbl)
 	SelfTbl = SelfTbl or ENTITY.GetTable(self)
 
+	local Default   = SelfTbl.DefaultSound
 	local Path      = SelfTbl.SoundPath
 	local LastSound = SelfTbl.LastSound
 
@@ -27,7 +28,8 @@ function ENT:UpdateSound(SelfTbl)
 		SelfTbl.LastSound = Path
 	end
 
-	if Path == "" then return end
+	if Path == nil or Path == "" then Path = Default end
+	if Path == "" or Path == nil then return end
 	if not SelfTbl.Active then return end
 
 	local Pitch, Volume = GetPitchVolume(SelfTbl)

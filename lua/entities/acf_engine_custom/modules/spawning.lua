@@ -78,7 +78,7 @@ local function UpdateEngine(Entity, ClassData)
 	Entity.CompressionRatio 	= Compute.CompressionRatio
 	Entity.Clearance      		= Compute.Clearance
 	Entity.CoolantLevel         = 0
-	Entity.DefaultSound       	= Entity.SoundPath
+	Entity.DefaultSound       	= "vehicles/junker/jnk_fourth_cruise_loop2.wav" -- Placeholder for now
 	Entity.Displacement 		= Displacement
 	Entity.FiringIrregularity 	= Compute.FiringIrregularity
 	Entity.FlywheelInertia 		= Compute.FlywheelInertia
@@ -178,11 +178,11 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.LastRPM       		= 0
 	self.LastTotalMass 		= 0
 	self.LastPhysMass  		= 0
+	self.LastSound          = ""
 	self.LastState 			= ""
 	self.LastOilPressure    = 0
 	self.LastOilWarning     = 0
 	self.LastPitch     		= 0
-	self.SoundPath     		= "vehicles/junker/jnk_fourth_cruise_loop2.wav" -- Placeholder for now
 	self.FuelUsage     		= 0
 	self.Layout 	   		= ""
 	self.Throttle 	   		= 0
@@ -197,6 +197,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.OilStarvation 		= 0
 	self.OilPressureOK 		= true
 	self.State         		= "Idle"
+	self.SoundPath          = ""
 	self.SoundBanks    		= {}
 	self.RailPressure       = 0
 	self.RailBuildRate      = 0
