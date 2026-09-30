@@ -1,8 +1,6 @@
 local ACF = ACF
 local Sounds = ACF.SoundToolSupport
 
-print("bitch")
-PrintTable({Sounds})
 Sounds.acf_engine_custom = {
 	GetSound = function(Ent)
 		return {
