@@ -26,10 +26,18 @@ function ENT:UpdateSound(SelfTbl)
 		self:DestroySound()
 
 		SelfTbl.LastSound = Path
+		SelfTbl.WasSoundReplaced = true
 	end
 
-	if Path == nil or Path == "" then Path = Default end
-	if Path == "" or Path == nil then return end
+	if Path == "" or Path == nil then
+		if not SelfTbl.WasSoundReplaced then
+			Path = Default
+		else
+			return
+		end
+	end
+
+	print(Path, LastSound, Default)
 	if not SelfTbl.Active then return end
 
 	local Pitch, Volume = GetPitchVolume(SelfTbl)

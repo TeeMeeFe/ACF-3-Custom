@@ -392,14 +392,12 @@ do -- Actual engine rpm and torque calculations
         local GearboxTotalRatio = 0
 
         local BoxesTbl = SelfTbl.Gearboxes
-        local TotalReqTq = 0
         -- Get the requirements for torque for the gearboxes (Max clutch rating minus any wheels currently spinning faster than the Flywheel)
         for Ent, Link in pairs(BoxesTbl) do
             local EntTbl = ENTITY.GetTable(Ent)
 
             if not EntTbl.Disabled then
-                Link.ReqTq = EntTbl.Calc(Ent, FlyRPM, FlyInertia)
-                TotalReqTq = TotalReqTq + Link.ReqTq
+                EntTbl.Calc(Ent, FlyRPM, FlyInertia)
 
                 GearboxCount      = GearboxCount + 1
                 GearboxLoad       = GearboxLoad + (EntTbl.Load or 0)

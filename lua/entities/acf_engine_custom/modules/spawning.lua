@@ -206,6 +206,7 @@ function ENT:ACF_PreSpawn(_, _, _, ClientData)
 	self.LastCoolantTemp    = AmbientTemperature
 	self.LastOilTemp        = AmbientTemperature
 	self.Temperature   		= {Coolant = AmbientTemperature, Oil = AmbientTemperature}
+	self.WasSoundReplaced   = false
 	self.WaterPumpFlow		= 0
 
 	duplicator.ClearEntityModifier(self, "mass")
