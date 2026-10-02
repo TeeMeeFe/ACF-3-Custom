@@ -37,7 +37,6 @@ function ENT:UpdateSound(SelfTbl)
 		end
 	end
 
-	print(Path, LastSound, Default)
 	if not SelfTbl.Active then return end
 
 	local Pitch, Volume = GetPitchVolume(SelfTbl)

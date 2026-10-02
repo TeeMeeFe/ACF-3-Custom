@@ -1,7 +1,7 @@
 local Sounds = ACF.Utilities.Sounds
 
 do -- Globals
-    -- ACF.SpeedOfSound          = 343 -- In Meters Per Second.
+    ACF.SpeedOfSound          = 343 * 39.3701 -- In Meters Per Second.
     ACF.AmbientTemperature    = 288.15 -- Override the previous one
     ACF.RoomTemperature       = 293.15 -- In Degrees Kelvin. This indicates the default temperature inside a safezone, if none defined.
     ACF.SpecificGasConstant   = 287    -- Specific gas constant of dry air in Joules per kilogram per degree Kelvin J/(kg*K) 
