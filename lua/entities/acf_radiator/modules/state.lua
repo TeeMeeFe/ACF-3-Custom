@@ -16,7 +16,7 @@ local RAM_AIR_REF_KPH = 100   -- kph at ~63% of max ram-air effect — TUNE
 -- Fan: flat contribution, covering exactly the case ram air can't
 -- (stationary/idling). Real fans don't match highway ram air — kept
 -- deliberately below 1 for that reason.
-local FAN_EFFECTIVENESS = 0.05  -- TUNE
+local FAN_EFFECTIVENESS = 0.15  -- TUNE
 
 -- Auto-thermostatic fan engagement 
 local FAN_AUTO_ON_TEMP  = 95   -- °C — TUNE

@@ -349,30 +349,30 @@ do -- Actual engine rpm and torque calculations
         SelfTbl.FuelPrimed   = SelfTbl.RailPressure >= 0.70  -- Fraction of full pressure considered "primed"
 
         -- Calculate air flow
-        local Press_air = SelfTbl.AmbientPressure -- TODO: Boost from any forced induction would be added here.
-        local Rho_air   = (Press_air / (ACF.SpecificGasConstant * SelfTbl.IntakeTemp)) * 100 -- Effective air density
-        local VE        = 0.40 + (Throttle * 0.60) -- Volumetric efficiency
-        local Mass_air  = ((SelfTbl.Displacement.InLiters * FlyRPM / 120) * Rho_air * VE) / 1000 -- Total air mass being consumed
+        -- local Press_air = SelfTbl.AmbientPressure -- TODO: Boost from any forced induction would be added here.
+        -- local Rho_air   = (Press_air / (ACF.SpecificGasConstant * SelfTbl.IntakeTemp)) * 100 -- Effective air density
+        -- local VE        = 0.40 + (Throttle * 0.60) -- Volumetric efficiency
+        -- local Mass_air  = ((SelfTbl.Displacement.InLiters * FlyRPM / 120) * Rho_air * VE) / 1000 -- Total air mass being consumed
 
         -- Lambda multiplier
-        local Lambda = Clamp((Mass_air / Mass_fuel) / 6.4, 0.4, 9.9) -- 14.7 is the Stoich_AFR from the fuel being used
-        local LambdaMult
+        -- local Lambda = Clamp((Mass_air / Mass_fuel) / 6.4, 0.4, 9.9) -- 14.7 is the Stoich_AFR from the fuel being used
+        -- local LambdaMult
 
-        if Lambda < 0.70 then
-            LambdaMult = 0.70
-        elseif Lambda < 0.85 then
-            LambdaMult = 0.90 + (Lambda - 0.70) / 0.15 * 0.10
-        elseif Lambda <= 1.00 then
-            LambdaMult = 1.00
-        elseif Lambda <= 1.05 then
-            LambdaMult = 1.00 - (Lambda - 1.00) / 0.05 * 0.10
-        elseif Lambda <= 1.30 then
-            LambdaMult = 0.90 - (Lambda - 1.05) / 0.25 * 0.90
-        else
-            LambdaMult = 0.0
-        end
+        -- if Lambda < 0.70 then
+        --     LambdaMult = 0.70
+        -- elseif Lambda < 0.85 then
+        --     LambdaMult = 0.90 + (Lambda - 0.70) / 0.15 * 0.10
+        -- elseif Lambda <= 1.00 then
+        --     LambdaMult = 1.00
+        -- elseif Lambda <= 1.05 then
+        --     LambdaMult = 1.00 - (Lambda - 1.00) / 0.05 * 0.10
+        -- elseif Lambda <= 1.30 then
+        --     LambdaMult = 0.90 - (Lambda - 1.05) / 0.25 * 0.90
+        -- else
+        --     LambdaMult = 0.0
+        -- end
 
-        LambdaMult = max(0, LambdaMult)
+        -- LambdaMult = max(0, LambdaMult)
 
         -- Calculate the current torque from flywheel RPM
         local Torque, Friction = 0, SelfTbl.Friction or 0
@@ -424,7 +424,7 @@ do -- Actual engine rpm and torque calculations
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = FlyInertia + GearboxInertia * GearboxLoad
 
-        local EngineTorque = ((Torque * LambdaMult) + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5)) ) - Friction -- Limited compression brake slip
+        local EngineTorque = (Torque + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5)) ) - Friction -- Limited compression brake slip
 
         -- Let's accelerate the flywheel based on that torque
         FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia, 0)
