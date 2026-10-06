@@ -424,7 +424,7 @@ do -- Actual engine rpm and torque calculations
         local FeedbackTq = Clamp((SlipDifference * GearboxInertia * GearboxLoad) * 0.5, -MaxTq, MaxTq)
         local IncomingInertia = FlyInertia + GearboxInertia * GearboxLoad
 
-        local EngineTorque = (Torque + StrTorque + (FeedbackTq * GearboxLoad) + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5)) ) - Friction -- Limited compression brake slip
+        local EngineTorque = (Torque + StrTorque + FeedbackTq + (CompressionBrakeTorque * max(1 - GearboxLoad, 0.5)) ) - Friction -- Limited compression brake slip
 
         -- Let's accelerate the flywheel based on that torque
         FlyRPM = max(FlyRPM + EngineTorque / IncomingInertia, 0)

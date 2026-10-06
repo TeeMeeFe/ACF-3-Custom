@@ -148,7 +148,7 @@ do -- Movement -----------------------------------------
 
         local Now = Clock.CurTime
 
-        if SelfTbl.LastActive == Now then return SelfTbl.TorqueOutput end
+        if SelfTbl.LastActive == Now then return SelfTbl.MeasuredRPM end
 
         if SelfTbl.ChangeFinished < Now then
             SelfTbl.InGear = true
@@ -163,7 +163,7 @@ do -- Movement -----------------------------------------
             end
 
             SelfTbl.CalcInertia = TotalInertia
-            return SelfTbl.TorqueOutput
+            return SelfTbl.MeasuredRPM
         end
 
         -- First Calc call this tick: seed the averager and compute fresh
@@ -216,9 +216,12 @@ do -- Movement -----------------------------------------
         local GearRatio = SelfTbl.GearRatio
 
         if GearRatio == 0 then
-            SelfTbl.TotalRatio = 0
+            SelfTbl.TotalRatio        = 0
             SelfTbl.DownstreamInertia = 0
-            SelfTbl.Load = 0
+            SelfTbl.Load              = 0
+            SelfTbl.MeasuredRPM       = 0
+            SelfTbl.LeftRPM           = 0
+            SelfTbl.RightRPM          = 0
             return 0
         end
 
@@ -226,10 +229,33 @@ do -- Movement -----------------------------------------
         local ScaledRPM     = InputRPM / GearRatio
         local ScaledInertia = InputInertia * GearRatio
 
+        local DoubleDiff = SelfTbl.DoubleDiff
+        local SteerRate  = SelfTbl.SteerRate
+
+        -- DoubleDiff steer low-pass filter. Kept here (runs exactly once
+        -- per tick via the CalcTick gate above), but now STORED on
+        -- SelfTbl for DistributeTorque to consume as a TORQUE-split
+        -- bias, rather than being used here to bias an RPM chase target.
+        if DoubleDiff then
+            local SteerRateFiltered = SelfTbl.SteerRateFiltered or 0
+
+            SteerRateFiltered = SteerRateFiltered + (SteerRate - SteerRateFiltered) * Tick / (0.04 + Tick)
+            SelfTbl.SteerRateFiltered = SteerRateFiltered
+
+            local Rate = SteerRateFiltered * 2
+            SelfTbl.LMult = min(0, Rate) + 1
+            SelfTbl.RMult = -max(0, Rate) + 1
+        else
+            SelfTbl.LMult, SelfTbl.RMult = 1, 1
+        end
+
         local MeasuredRPMSum = 0
         local MeasuredCount = 0
         local DownstreamInertia = 0
         local TotalRatioSum = 0
+        -- Per-side RPM tracking, future work for LSD/locked diffs. 
+        local LeftRPMSum, LeftCount = 0, 0
+        local RightRPMSum, RightCount = 0, 0
 
         -- Downstream gearboxes
         for Gearbox, Link in pairs(SelfTbl.GearboxOut) do
@@ -237,42 +263,49 @@ do -- Movement -----------------------------------------
 
             if not Gearbox.Disabled then
                 Gearbox:Calc(ScaledRPM, ScaledInertia) -- measurement pull, just to update gearboxes downstream
-
-                MeasuredRPMSum    = MeasuredRPMSum + (EntTbl.MeasuredRPM or ScaledRPM) * GearRatio
-                MeasuredCount     = MeasuredCount + 1
-                DownstreamInertia = DownstreamInertia + (EntTbl.DownstreamInertia or 0)
-                TotalRatioSum     = TotalRatioSum + abs(GearRatio) * (EntTbl.TotalRatio or 1)
             end
+
+            MeasuredRPMSum    = MeasuredRPMSum + (EntTbl.MeasuredRPM or ScaledRPM) * GearRatio
+            MeasuredCount     = MeasuredCount + 1
+            DownstreamInertia = DownstreamInertia + (EntTbl.DownstreamInertia or 0)
+            TotalRatioSum     = TotalRatioSum + abs(GearRatio) * (EntTbl.TotalRatio or 1)
         end
 
         -- Wheels: PURE measurement now, it just no longer generates a torque demand.
         for Wheel, Link in pairs(SelfTbl.Wheels) do
-            if GearRatio ~= 0 then
-                local WheelRPM = CalcWheel(self, Link, Wheel, ChassisAV)
-                MeasuredRPMSum = MeasuredRPMSum + WheelRPM
-                MeasuredCount  = MeasuredCount + 1
-                DownstreamInertia = DownstreamInertia + GetRotationalInertia(Link, Wheel)
+            local WheelRPM = CalcWheel(self, Link, Wheel, ChassisAV)
+
+            MeasuredRPMSum    = MeasuredRPMSum + WheelRPM
+            MeasuredCount     = MeasuredCount + 1
+            DownstreamInertia = DownstreamInertia + GetRotationalInertia(Link, Wheel)
+
+            if Link.Side == 0 then
+                LeftRPMSum = LeftRPMSum + WheelRPM
+                LeftCount  = LeftCount + 1
             else
-                MeasuredRPMSum = 0
-                MeasuredCount  = 0
-                DownstreamInertia = 0
+                RightRPMSum = RightRPMSum + WheelRPM
+                RightCount  = RightCount + 1
             end
         end
 
         -- Effectors
-        for Effector, Link in pairs(SelfTbl.Effectors) do
-            local Clutch = Link.Side == 0 and LClutch or RClutch
-
+        for Effector in pairs(SelfTbl.Effectors) do
             if not Effector.Disabled then
-                local Req = abs(Effector:Calc(ScaledRPM, ScaledInertia) / GearRatio) * Clutch
-                Req = Req -- TODO: I dunno what to do here
+                Effector:Calc(ScaledRPM, ScaledInertia)
             end
         end
 
         SelfTbl.MeasuredRPM = MeasuredCount > 0 and (MeasuredRPMSum / MeasuredCount) or InputRPM
-        SelfTbl.DownstreamInertia = GearRatio ~= 0 and (DownstreamInertia / abs(GearRatio)) or 0
-        SelfTbl.TotalRatio = GearRatio ~= 0 and (abs(GearRatio) + (TotalRatioSum > 0 and TotalRatioSum or 0)) or 0
-        SelfTbl.Load = GearRatio == 0 and 0 or ((LClutch + RClutch) * 0.5)
+        SelfTbl.LeftRPM  = LeftCount  > 0 and (LeftRPMSum  / LeftCount)  or SelfTbl.MeasuredRPM
+        SelfTbl.RightRPM = RightCount > 0 and (RightRPMSum / RightCount) or SelfTbl.MeasuredRPM
+        SelfTbl.DownstreamInertia = DownstreamInertia
+        SelfTbl.TotalRatio = abs(GearRatio) * max(TotalRatioSum, 1)
+        SelfTbl.Load = (LClutch + RClutch) * 0.5
+
+        self:UpdateOverlay()
+        -- SelfTbl.DownstreamInertia = GearRatio ~= 0 and (DownstreamInertia / abs(GearRatio)) or 0
+        -- SelfTbl.TotalRatio = GearRatio ~= 0 and (abs(GearRatio) + (TotalRatioSum > 0 and TotalRatioSum or 0)) or 0
+        -- SelfTbl.Load = GearRatio == 0 and 0 or ((LClutch + RClutch) * 0.5)
 
         return SelfTbl.MeasuredRPM
     end
@@ -284,11 +317,6 @@ do -- Movement -----------------------------------------
         local GearRatio = SelfTbl.GearRatio
         if GearRatio == 0 then return end
 
-        local TotalInertia = SelfTbl.DownstreamInertia
-        if TotalInertia <= 0 then return end
-
-        local LClutch, RClutch = SelfTbl.LClutch, SelfTbl.RClutch
-
         -- Internal torque loss from damage
         local Health = SelfTbl.ACF.Health
         local MaxHP  = SelfTbl.ACF.MaxHealth
@@ -298,37 +326,58 @@ do -- Movement -----------------------------------------
 
         -- Automatic torque-converter slip penalty
         local Slop = SelfTbl.Automatic and 0.9 or 1.0
-        local Sign = GearRatio >= 0 and 1 or -1
+        -- Capacity ceiling: this gearbox's own rated torque, a gearbox cannot transmit more than it's rated for, even if the engine sends more.
+        local ClampedTorque = Clamp(Torque, -SelfTbl.MaxTorque, SelfTbl.MaxTorque)
         -- Reflect through this stage's own ratio, same direction gearboxes already scale torque.
-        local StageTorque = Torque * Sign * Loss * Slop
+        local StageTorque = ClampedTorque * GearRatio * Loss * Slop
+
+        local TotalInertia = SelfTbl.DownstreamInertia
+        if TotalInertia <= 0 then return end
+
+        local LClutch = SelfTbl.LClutch
+        local RClutch = SelfTbl.RClutch
+        -- local ChassisAV = GetChassisAngleVelocity(self)
+        local LMult = SelfTbl.LMult or 1
+        local RMult = SelfTbl.RMult or 1
+        local DoubleDiff = SelfTbl.DoubleDiff
+        local SteerRate = SelfTbl.SteerRate
+
+        local ReactTq = 0
 
         -- Direction forwarded to effectors so reversible props work
         local Direction = SelfTbl.Drive == 2 and -1 or 1
 
-        local DoubleDiff = SelfTbl.DoubleDiff
-        local SteerRate  = SelfTbl.SteerRate
+        -- Transfer torque to our entities
+        -- Downstream gearboxes, split by inertia share; aka, a branch with more reflected inertia
+        -- (a heavier / more-loaded sub-chain) gets proportionally more of the available torque.
+        for Ent, Link in pairs(SelfTbl.GearboxOut) do
+            local Clutch = Link.Side == 0 and LClutch or RClutch
 
-        local WheelTorque = 0
-        local LMult, RMult = 1, 1
+            if not Ent.Disabled and Clutch > 0 then
+                local EntTbl = ENTITY.GetTable(Ent)
+                local Share = (EntTbl.DownstreamInertia or 0) / TotalInertia
 
-        -- DoubleDiff steer low-pass filter
-        if DoubleDiff then
-            local SteerRateFiltered = SelfTbl.SteerRateFiltered or 0
-
-            -- First order low-pass
-            SteerRateFiltered = SteerRateFiltered + (SteerRate - SteerRateFiltered) * Tick / (0.04 + Tick)
-            SelfTbl.SteerRateFiltered = SteerRateFiltered
-
-            local Rate = SteerRateFiltered * 2
-            LMult = min(0, Rate) + 1
-            RMult = -max(0, Rate) + 1
+                Link:TransferGearbox(Ent, StageTorque * Share * Clutch, DeltaTime, MassRatio, FlyRPM)
+            end
         end
 
-        -- Transfer torque to our entities
+        -- Effectors
+        for Effector, Link in pairs(SelfTbl.Effectors) do
+            local Clutch = Link.Side == 0 and LClutch or RClutch
+
+            if not Effector.Disabled and Clutch > 0 then
+                local EntTbl = ENTITY.GetTable(Effector)
+                local Share = (EntTbl.DownstreamInertia or 0) / TotalInertia
+
+                Link:TransferEffector(Effector, StageTorque * Share * Clutch, DeltaTime, MassRatio, FlyRPM, Direction)
+            end
+        end
+
+        -- Wheels
         for Wheel, Link in pairs(SelfTbl.Wheels) do
             local Clutch = Link.Side == 0 and LClutch or RClutch
 
-            if Clutch > 0 then
+            if SelfTbl.InGear and Clutch > 0 then
                 local WheelInertia = GetRotationalInertia(Link, Wheel)
                 local Share = WheelInertia / TotalInertia
                 local Multiplier = 1
@@ -337,44 +386,24 @@ do -- Movement -----------------------------------------
                     Multiplier = Link.Side == 0 and LMult or RMult
                 end
 
-                local Capacity = SelfTbl.MaxTorque * Clutch
-                WheelTorque = Clamp(StageTorque * Share * Clutch * Multiplier, -Capacity, Capacity)
+                local WheelTorque = StageTorque * Share * Clutch * Multiplier
 
                 Link:TransferWheel(Wheel, WheelTorque, DeltaTime)
+                ReactTq = ReactTq + WheelTorque
             end
 
-            WireLib.TriggerOutput(self, "Output Torque", WheelTorque)
-            SelfTbl.TorqueOutput = WheelTorque
-        end
-
-        -- Downstream gearboxes
-        for Ent, Link in pairs(SelfTbl.GearboxOut) do
-            local EntTbl = ENTITY.GetTable(Ent)
-
-            if not EntTbl.Disabled then
-                local Clutch = Link.Side == 0 and LClutch or RClutch
-
-                if Clutch > 0 then
-                    local Share = (EntTbl.DownstreamInertia or 0) / TotalInertia
-                    Link:TransferGearbox(Ent, StageTorque * Share * Clutch, DeltaTime, MassRatio, FlyRPM)
-                end
-            end
-        end
-
-        -- Effectors
-        for Effector, Link in pairs(SelfTbl.Effectors) do
-            local Share = (EntTbl.DownstreamInertia or 0) / TotalInertia
-            Link:TransferEffector(Effector, StageTorque * Share, DeltaTime, MassRatio, FlyRPM, Direction)
+            WireLib.TriggerOutput(self, "Output Torque", ReactTq)
+            SelfTbl.TorqueOutput = ReactTq
         end
 
         -- Chassis reaction torque: Newton's third law makes the body twist opposite to the drive direction when power is applied
-        if WheelTorque ~= 0 then
+        if ReactTq ~= 0 then
             local BoxPhys = ENTITY.GetPhysicsObject(ENTITY.GetAncestor(self))
 
             if IsPhysObjValid(BoxPhys) then
                 local RightDir = ENTITY.GetRight(self)
 
-                VECTOR.Mul(RightDir, StageTorque * MassRatio)
+                VECTOR.Mul(RightDir, ReactTq * MassRatio)
                 PHYSOBJ.ApplyTorqueCenter(BoxPhys, RightDir)
             end
         end
