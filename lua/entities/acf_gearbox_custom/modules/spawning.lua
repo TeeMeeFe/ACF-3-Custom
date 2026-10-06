@@ -128,7 +128,7 @@ local function UpdateGearbox(Entity, Gearbox)
     Entity.GearAmount         = MaxGear
     Entity.GearboxLegacyRatio = Entity:ACF_GetUserVar("GearboxLegacyRatio")
 
-    Entity.Name         = Gearbox.Name
+    Entity.Name         = "Custom " .. Gearbox.Name
     Entity.ShortName    = ShortName(Gearbox:GetType())
 
     local SplitID       = string.Split(Entity.ShortName, "-")
