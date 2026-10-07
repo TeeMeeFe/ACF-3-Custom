@@ -232,10 +232,7 @@ do -- Movement -----------------------------------------
         local DoubleDiff = SelfTbl.DoubleDiff
         local SteerRate  = SelfTbl.SteerRate
 
-        -- DoubleDiff steer low-pass filter. Kept here (runs exactly once
-        -- per tick via the CalcTick gate above), but now STORED on
-        -- SelfTbl for DistributeTorque to consume as a TORQUE-split
-        -- bias, rather than being used here to bias an RPM chase target.
+        -- DoubleDiff steer low-pass filter.
         if DoubleDiff then
             local SteerRateFiltered = SelfTbl.SteerRateFiltered or 0
 
@@ -274,10 +271,12 @@ do -- Movement -----------------------------------------
         -- Wheels: PURE measurement now, it just no longer generates a torque demand.
         for Wheel, Link in pairs(SelfTbl.Wheels) do
             local WheelRPM = CalcWheel(self, Link, Wheel, ChassisAV)
+            local WheelInertia = GetRotationalInertia(Link, Wheel)
+            Link.CachedInertia = WheelInertia
 
             MeasuredRPMSum    = MeasuredRPMSum + WheelRPM
             MeasuredCount     = MeasuredCount + 1
-            DownstreamInertia = DownstreamInertia + GetRotationalInertia(Link, Wheel)
+            DownstreamInertia = DownstreamInertia + WheelInertia
 
             if Link.Side == 0 then
                 LeftRPMSum = LeftRPMSum + WheelRPM
@@ -290,9 +289,13 @@ do -- Movement -----------------------------------------
 
         -- Effectors
         for Effector in pairs(SelfTbl.Effectors) do
+            local EntTbl = ENTITY.GetTable(Effector)
+
             if not Effector.Disabled then
                 Effector:Calc(ScaledRPM, ScaledInertia)
             end
+
+            DownstreamInertia = DownstreamInertia + (EntTbl.DownstreamInertia or 0)
         end
 
         SelfTbl.MeasuredRPM = MeasuredCount > 0 and (MeasuredRPMSum / MeasuredCount) or InputRPM
@@ -303,9 +306,6 @@ do -- Movement -----------------------------------------
         SelfTbl.Load = (LClutch + RClutch) * 0.5
 
         self:UpdateOverlay()
-        -- SelfTbl.DownstreamInertia = GearRatio ~= 0 and (DownstreamInertia / abs(GearRatio)) or 0
-        -- SelfTbl.TotalRatio = GearRatio ~= 0 and (abs(GearRatio) + (TotalRatioSum > 0 and TotalRatioSum or 0)) or 0
-        -- SelfTbl.Load = GearRatio == 0 and 0 or ((LClutch + RClutch) * 0.5)
 
         return SelfTbl.MeasuredRPM
     end
@@ -336,7 +336,6 @@ do -- Movement -----------------------------------------
 
         local LClutch = SelfTbl.LClutch
         local RClutch = SelfTbl.RClutch
-        -- local ChassisAV = GetChassisAngleVelocity(self)
         local LMult = SelfTbl.LMult or 1
         local RMult = SelfTbl.RMult or 1
         local DoubleDiff = SelfTbl.DoubleDiff
@@ -378,7 +377,7 @@ do -- Movement -----------------------------------------
             local Clutch = Link.Side == 0 and LClutch or RClutch
 
             if SelfTbl.InGear and Clutch > 0 then
-                local WheelInertia = GetRotationalInertia(Link, Wheel)
+                local WheelInertia = Link.CachedInertia or GetRotationalInertia(Link, Wheel)
                 local Share = WheelInertia / TotalInertia
                 local Multiplier = 1
 
@@ -388,6 +387,7 @@ do -- Movement -----------------------------------------
 
                 local WheelTorque = StageTorque * Share * Clutch * Multiplier
 
+                print(WheelTorque)
                 Link:TransferWheel(Wheel, WheelTorque, DeltaTime)
                 ReactTq = ReactTq + WheelTorque
             end
