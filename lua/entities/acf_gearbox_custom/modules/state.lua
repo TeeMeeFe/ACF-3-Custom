@@ -387,7 +387,6 @@ do -- Movement -----------------------------------------
 
                 local WheelTorque = StageTorque * Share * Clutch * Multiplier
 
-                print(WheelTorque)
                 Link:TransferWheel(Wheel, WheelTorque, DeltaTime)
                 ReactTq = ReactTq + WheelTorque
             end
