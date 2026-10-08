@@ -445,7 +445,7 @@ do -- Actual engine rpm and torque calculations
         SelfTbl.Friction = Friction -- Assembly Friction
 
         local MassRatio = SelfTbl.MassRatio
-        local DriveTorque = Torque + StrTorque - FeedbackTq
+        local DriveTorque = EngineTorque + Friction - FeedbackTq
 
         if GearboxCount > 0 then
             for Ent, Link in pairs(BoxesTbl) do
