@@ -453,7 +453,7 @@ do -- Actual engine rpm and torque calculations
 
                 if not EntTbl.Disabled then
                     local Share = (EntTbl.DownstreamInertia or 0) / max(GearboxInertia, 1e-6)
-                    Link:TransferGearbox(Ent, DriveTorque * Share, DeltaTime, MassRatio, FlyRPM)
+                    Link:TransferGearbox(Ent, DriveTorque * Share * (MassRatio ^ 0.6), DeltaTime, MassRatio, FlyRPM)
                 end
             end
         end

@@ -226,11 +226,11 @@ function ENT:ACF_SetupWireIO(Inputs, Outputs)
     if self.DualClutch then
         Inputs[#Inputs + 1] = "Left Clutch (Sets the percentage of power, from 0 to 1, that will not be passed to the left side output.)"
         Inputs[#Inputs + 1] = "Right Clutch (Sets the percentage of power, from 0 to 1, that will not be passed to the right side output.)"
-        Inputs[#Inputs + 1] = "Left Brake (Sets the amount of power given to the left side brakes.)"
-        Inputs[#Inputs + 1] = "Right Brake (Sets the amount of power given to the right side brakes.)"
+        Inputs[#Inputs + 1] = "Left Brake (Sets the amount of braking torque in Nm, given to the left side brakes.)"
+        Inputs[#Inputs + 1] = "Right Brake (Sets the amount of braking torque in Nm, given to the right side brakes.)"
     else
         Inputs[#Inputs + 1] = "Clutch (Sets the percentage of power, from 0 to 1, that will not be passed to the output.)"
-        Inputs[#Inputs + 1] = "Brake (Sets the amount of power given to the brakes.)"
+        Inputs[#Inputs + 1] = "Brake (Sets the amount of braking torque in Nm, given to the brakes.)"
     end
 end
 
